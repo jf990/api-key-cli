@@ -1,4 +1,7 @@
+secret.js
+
 # Logs
+*.csv
 logs
 *.log
 npm-debug.log*
@@ -8,6 +11,32 @@ lerna-debug.log*
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# no temp files
+.DS_Store
+~$*
+*~
+*.swp
+*.swo
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
 # Runtime data
 pids
@@ -67,8 +96,10 @@ web_modules/
 
 # dotenv environment variable files
 .env
+*.env
 .env.*
 !.env.example
+!.env.sample
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
