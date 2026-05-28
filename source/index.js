@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Generate usage reports of your ArcGIS Platform authentication (OAuth apps and API keys.)
  * Report generation requires a logged in user. Update .env with your credentials and make
@@ -25,7 +26,7 @@ let showVerbose = false;
 function performRequestAction() {
     dotenv.config();
     const args = getCommandLineParameters();
-    const action = args.a ?? "report";
+    const action = args.a ?? "help";
     let outputFile;
     let outputFileFormat;
     showVerbose = args.v ?? false;
@@ -81,6 +82,17 @@ function performRequestAction() {
       case "regen":
         // generate new tokens for api key 1, 2 or both, given the item ID.
         regenerateAPIKey(args);
+        break;
+      case "help":
+        log(`Usage: api-key-helper -a [action] [options]`, "warn");
+        log(`.    : -a inspect -i <item-id>`, "warn");
+        log(`.    : -a inspect -t <token>`, "warn");
+        log(`.    : -a report -o <output-file> -f <output-format>`, "warn");
+        log(`.    : -a update -i <item-id> -c <options-file>`, "warn");
+        log(`.    : -a delete -i <item-id>`, "warn");
+        log(`.    : -a revoke -i <item-id>`, "warn");
+        log(`.    : -a regen -i <item-id> -t <token>`, "warn");
+        log(`.    : -a genkeys -n <number-of-keys> -c <options-file> -o <output-file> -f <output-format>`, "warn");
         break;
       default:
         log(`Unknown action ${action}. Action is required. Valid actions are genkeys, report, inspect, update, delete, revoke.`, "error");

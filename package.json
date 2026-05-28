@@ -1,26 +1,42 @@
 {
-    "name": "api-key-cli",
+    "name": "@jf990/api-key-cli",
     "version": "1.0.0",
     "description": "CLI app to provide various helpers for working with ArcGIS API keys",
     "main": "source/index.js",
     "type": "module",
+    "bin":{
+        "api-key-helper": "source/index.js",
+        "api-key-cli": "source/index.js"
+    },
+    "repository": {
+        "type": "git", 
+        "url": "https://github.com/jf990/api-key-cli.git" 
+    },
     "scripts": {
         "start": "node ./source/index.js",
         "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
     },
     "keywords": [
+        "cli",
         "usage",
         "arcgis",
-        "report"
+        "report",
+        "api keys",
+        "developer credentials",
+        "api-key-helper"
     ],
     "author": "jf",
     "license": "Apache 2.0",
+    "publishConfig": {
+        "access": "public"
+    },
     "dependencies": {
         "@esri/arcgis-rest-developer-credentials": "^4.10.2",
         "@esri/arcgis-rest-portal": "^4.10.2",
         "@esri/arcgis-rest-request": "^4.10.2",
         "chalk": "^5.6.2",
         "dotenv": "^17.4.2",
+        "esm": "^3.2.25",
         "fs-extra": "^11.3.5",
         "yaml": "^2.9.0",
         "yargs": "^18.0.0"

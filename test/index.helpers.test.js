@@ -1,3 +1,6 @@
+/**
+ * Basic unit tests for helper functions in index.js. These tests focus on the logic of the helper functions and do not involve any external API calls or file system interactions.
+ */
 import {
     getAccessTokenParameter,
     getItemIDParameter,
