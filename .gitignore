@@ -1,4 +1,5 @@
 secret.js
+apikeys.json
 
 # Logs
 *.csv

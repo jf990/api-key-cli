@@ -69,7 +69,7 @@ Certain parameters can be sent in via environment variables. These will override
 - `ARCGIS_USER_NAME`: Set to the account user name of the account to use.
 - `ARCGIS_USER_PASSWORD`: Password to account.
 - `ARCGIS_TOKEN`: An ArcGIS access token or API key, this will override any `-t` CLI argument.
-- `ARCGIS_ITEM_ID`: An ArcGOS portal item identifier, this will override any `-i` CLI argument.
+- `ARCGIS_ITEM_ID`: An ArcGIS portal item identifier, this will override any `-i` CLI argument.
 
 ## API key attributes
 
@@ -93,20 +93,6 @@ options:
 
 ### Test cases
 
-npm start -- -a inspect -o flyfry.csv -f csv -t AAPTaRjRS34vKR2crRtJ1254sug..4MXc9M90oO3i0ckzYNcqBQJx23hU9GJJSmefesa9wQ15fiTCzXBYhc1FccFwbEq2X_WIzTCA-aEZNQVS2t1Tt1ui86NRfM_wd0pQCSXV62kUkMkusRaj8SZt1_eBRaPK-Y92WojGWXCckeMcGtWP_huYk_WRvfSyH0WkEkZfyryg5asVYNsHMU_cttkOa68ucklw4NFReS0bx56kca80yPg5bC57eYYCRXSUGoXtr5FoppbNl831AT1_E5SupWv3
+`npm start -- -a inspect -o my_keys.csv -f csv -t YOUR_API_KEY`
 
-npm start -- -a inspect -o flyfry.json -f json -t AAPTaRjRS34vKR2crRtJ1254sug..4MXc9M90oO3i0ckzYNcqBQJx23hU9GJJSmefesa9wQ15fiTCzXBYhc1FccFwbEq2X_WIzTCA-aEZNQVS2t1Tt1ui86NRfM_wd0pQCSXV62kUkMkusRaj8SZt1_eBRaPK-Y92WojGWXCckeMcGtWP_huYk_WRvfSyH0WkEkZfyryg5asVYNsHMU_cttkOa68ucklw4NFReS0bx56kca80yPg5bC57eYYCRXSUGoXtr5FoppbNl831AT1_E5SupWv3
-
-npm start -- -a inspect -t AAPTaRjRS34vKR2crRtJ1254sug..4MXc9M90oO3i0ckzYNcqBQJx23hU9GJJSmefesa9wQ15fiTCzXBYhc1FccFwbEq2X_WIzTCA-aEZNQVS2t1Tt1ui86NRfM_wd0pQCSXV62kUkMkusRaj8SZt1_eBRaPK-Y92WojGWXCckeMcGtWP_huYk_WRvfSyH0WkEkZfyryg5asVYNsHMU_cttkOa68ucklw4NFReS0bx56kca80yPg5bC57eYYCRXSUGoXtr5FoppbNl831AT1_E5SupWv3
-
-(put token in .env)
-npm start -- -a inspect
-
-npm start -- -a inspect -o booboo.csv -f csv -i 65c0928dc8dd4f6fb442a085b8b96dd9
-
-npm start -- -a inspect -o booboo.json -f json -i 65c0928dc8dd4f6fb442a085b8b96dd9
-
-npm start -- -a inspect -i 65c0928dc8dd4f6fb442a085b8b96dd9
-
-(put item in .env)
-npm start -- -a inspect
+`npm start -- -a inspect -i YOUR_ITEM_ID`
