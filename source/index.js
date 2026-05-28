@@ -16,6 +16,7 @@ import dotenv from "dotenv";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import chalk from "chalk";
+import { fileURLToPath } from "url";
 let showVerbose = false;
 
 /**
@@ -920,4 +921,18 @@ function getCommandLineParameters() {
     return args;
 }
 
-performRequestAction();
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirectRun) {
+    performRequestAction();
+}
+
+export {
+    getAccessTokenParameter,
+    getItemIDParameter,
+    getRelativeExpireDate,
+    isEmpty,
+    dateFromOptions,
+    localDateFormat,
+    isNumeric,
+    normalizeItemType,
+};

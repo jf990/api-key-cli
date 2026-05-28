@@ -6,7 +6,7 @@
     "type": "module",
     "scripts": {
         "start": "node ./source/index.js",
-        "test": "echo No tests available, just run npm start."
+        "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
     },
     "keywords": [
         "usage",
@@ -24,5 +24,8 @@
         "fs-extra": "^11.3.5",
         "yaml": "^2.9.0",
         "yargs": "^18.0.0"
+    },
+    "devDependencies": {
+        "jest": "^29.7.0"
     }
 }
