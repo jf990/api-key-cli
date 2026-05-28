@@ -25,6 +25,8 @@ function performRequestAction() {
     dotenv.config();
     const args = getCommandLineParameters();
     const action = args.a ?? "report";
+    let outputFile;
+    let outputFileFormat;
     showVerbose = args.v ?? false;
 
     switch(action) {
@@ -32,9 +34,9 @@ function performRequestAction() {
         // create new API keys
         const numberOfKeys = args.n ?? 1;
         const optionsFile = args.c ?? "./api-key-attributes.yaml";
-        const outputFile = args.o ?? "api-keys.csv";
-        const outputFileFormat = args.f ?? "csv";
         const sessionApiKeyOptions = loadOptions(optionsFile);
+        outputFile = args.o ?? "api-keys.csv";
+        outputFileFormat = args.f ?? "csv";
         if (sessionApiKeyOptions) {
             log(`generate ${numberOfKeys} keys with options ${optionsFile} that will expire on ${sessionApiKeyOptions.apiToken1ExpirationDate}`, "info");
             createNewAPIKeys(sessionApiKeyOptions, numberOfKeys, outputFile, outputFileFormat);
@@ -42,15 +44,15 @@ function performRequestAction() {
         break;
       case "report":
         // generate a report of all developer credentials
-        const outputFile = args.o ?? "./api-keys.yaml";
-        const outputFileFormat = args.f ?? "csv";
+        outputFile = args.o ?? "./api-keys.yaml";
+        outputFileFormat = args.f ?? "csv";
         usageReport(outputFile, outputFileFormat);
         break;
       case "inspect":
         // inspect properties of a single api key
         const token = getAccessTokenParameter(args);
-        const outputFile = args.o ?? "stdout";
-        const outputFileFormat = args.f ?? "json";
+        outputFile = args.o ?? "stdout";
+        outputFileFormat = args.f ?? "json";
         if (token != "") {
             inspectAPIKeyToken(token, outputFile, outputFileFormat.toLowerCase());
         } else {
@@ -169,27 +171,6 @@ function isEmpty(value) {
 }
 
 /**
- * Clean the tags array as it gets messy with extra quotes and brackets and flatten it into a single string.
- * @param {array|string} tags Tags returned from an item query.
- * @returns {string} Flattened and cleaned list of tags.
- */
-function cleanTags(tags) {
-    function tagReplace(tag) {
-        return tag.replace(/\"/g, "").replace(/\[/g, "").replace(/\]/g, "").trim();
-    }
-
-    let listOfTags = "";
-    if (Array.isArray(tags)) {
-        tags.forEach(function(tag) {
-            listOfTags += (listOfTags ? ", " : "") + tagReplace(tag);
-        });
-    } else {
-        listOfTags = tagReplace(tags);
-    }
-    return listOfTags;
-}
-
-/**
  * Determine the api key expiration date by considering 2 values. The first is a real date,
  * hopefully in the future, in a form that is parsable by the Date object. If this is not
  * provided or invalid, then use the second parameter as the number of days from today.
@@ -257,10 +238,10 @@ function loadOptions(filePath) {
             let localOptions = options.options ?? options;
             apiKeyOptions.title = localOptions.title ?? "No title";
             apiKeyOptions.description = localOptions.description ?? "No description provided.";
-            apiKeyOptions.tags = JSON.stringify(localOptions.tags ?? []);
-            apiKeyOptions.privileges = JSON.stringify(localOptions.privileges ?? []);
-            apiKeyOptions.httpReferrers = JSON.stringify(localOptions.referrers ?? []);
-            apiKeyOptions.redirect_uris = JSON.stringify(localOptions.redirect_uris ?? []);
+            apiKeyOptions.tags = localOptions.tags ?? [];
+            apiKeyOptions.privileges = localOptions.privileges ?? [];
+            apiKeyOptions.httpReferrers = localOptions.referrers ?? [];
+            apiKeyOptions.redirect_uris = localOptions.redirect_uris ?? [];
             apiKeyOptions.generateToken1 = localOptions.generateToken1 ?? true;
             apiKeyOptions.apiToken1ExpirationDate = dateFromOptions(localOptions.apiToken1ExpirationDate ?? "", localOptions.apiToken1ExpirationDays ?? 0);
             apiKeyOptions.generateToken2 = localOptions.generateToken2 ?? false;
@@ -616,7 +597,7 @@ async function updateAPIKeyProperties(args) {
     }
     const tags = args.k ?? "";
     if (!isEmpty(tags)) {
-        itemUpdateOptions.tags = tags.split(",");
+        itemUpdateOptions.tags = tags.split(",").map(function(tag) { return tag.trim(); });
         hasItemUpdateOptions = true;
     }
     try {
@@ -773,7 +754,7 @@ async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
                         description: apiKeyResponse.item.description,
                         owner: apiKeyResponse.item.owner,
                         created: apiKeyResponse.item.created > 0 ? localDateFormat(apiKeyResponse.item.created) : "",
-                        tags: cleanTags(apiKeyResponse.item.tags),
+                        tags: apiKeyResponse.item.tags,
                         privileges: apiKeyResponse.privileges,
                         referrers: apiKeyResponse.httpReferrers,
                         redirectURIs: apiKeyResponse.redirectURIs,
