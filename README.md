@@ -4,10 +4,10 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 
 - Get a list of your API keys and OAuth apps.
 - Get a report of your API key and OAuth app service usage.
-- Revoke keys
-- Regenerate keys
-- Update the item meta data
-- Create new keys
+- Revoke keys.
+- Regenerate keys.
+- Update the item meta data.
+- Create new keys.
 
 ## Accounts
 
@@ -26,28 +26,28 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
 
 ## Command line arguments
 
-* ✅ `-a genkeys`: generate new API keys using API key options template (see YAML file format below)
+* ✅ `-a genkeys`: generate new API keys using API key options template (see YAML file format below).
     `-n` numberOfKeys
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), default is `./api-key-attributes.yaml`
     `-f` output format CSV|JSON|table
     `-o` output file path, if empty then STDOUT
-* ✅ `-a inspect`: show properties for a single api key
+* ✅ `-a inspect`: show properties for a single api key.
     `-t` token or an existing API key access token or user OAuth access token
     `-i` itemId and ArcGIS portal item identifier
     `-f` output format CSV|JSON|table
     `-o` output file path, if empty then STDOUT
-* ✅ `-a report`: generate API keys report as CSV file
+* ✅ `-a report`: generate API keys report as CSV file.
     `-o` output file path, if empty then STDOUT
     `-f` output format CSV|JSON|table
-* ✅ `-a revoke`: revoke a token on an existing api key
+* ✅ `-a revoke`: revoke a token on an existing api key.
     `-i` ArcGIS portal item identifier of the API key to revoke
     `-k` 1|2|all for which token to revoke, token 1, 2 or all tokens
-* ✅ `-a regen`: generate new tokens for an existing api key
+* ✅ `-a regen`: generate new tokens for an existing api key.
     `-i` ArcGIS portal item identifier of the API key to update
     `-k` 1|2|all for which token to regenerate
     `-d` date or daysUntilExpiration key 1
-    `-e` date or daysUntilExpiration key 2.
-* ✅ `-a update`: update an API key meta data such as title, description, tags, privileges, referrers, or redirect URIs
+    `-e` date or daysUntilExpiration key 2
+* ✅ `-a update`: update an API key meta data such as title, description, tags, privileges, referrers, or redirect URIs.
     `-i` ArcGIS portal item identifier of the API key to update
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), or use the following command line options (NOTE: not easy to do this on the CLI if using any special characters):
     `-t` title
@@ -56,11 +56,11 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
     `-p` privileges comma separated string
     `-r` referrers comma separated string
     `-u` redirect URIs comma separated string
-* ✅ `-a delete`: delete an existing api key
+* ✅ `-a delete`: delete an existing api key.
     `-i` ArcGIS portal item identifier of the API key to delete
 * `-v` verbose output, will send extra information to STDOUT. Will mess up CSV or JSON output when not saving to a file.
-* `--help` show help on CLI arguments
-* `--version` show version information
+* `--help` show help on CLI arguments.
+* `--version` show version information.
 
 ## .env tokens
 
@@ -73,7 +73,7 @@ Certain parameters can be sent in via environment variables. These will override
 
 ## API key attributes
 
-When using the `genkeys` or `update` actions, the `-c` CLI argument is a file path to the API key options YAML formatted file. This describes the meata data that defines your API key portal item. It uses the following format:
+When using the `genkeys` or `update` actions, the `-c` CLI argument is a file path to the API key options YAML formatted file. This describes the meta data that defines your API key portal item. It uses the following format:
 
 ```yaml
 options:
