@@ -8,10 +8,10 @@ import {
     dateFromOptions,
     localDateFormat,
     isNumeric,
-    normalizeItemType,
-} from "../source/index.js";
+    normalizeItemType
+} from "../source/utils.js";
 
-describe("index helper functions", function() {
+describe("Utility helper functions", function() {
     afterEach(function() {
         delete process.env.ARCGIS_TOKEN;
         delete process.env.ARCGIS_ITEM_ID;

@@ -93,6 +93,14 @@ options:
 
 ### Test cases
 
-`npm start -- -a inspect -o my_keys.csv -f csv -t YOUR_API_KEY`
+- `npm start -- -a inspect -o my_keys.csv -f csv -t YOUR_API_KEY`
+- `npm start -- -a inspect -i YOUR_ITEM_ID`
+- `npm start -- -a genkeys -n 5 -c api-key-attributes.yaml -o api-keys.json -f json`
 
-`npm start -- -a inspect -i YOUR_ITEM_ID`
+### CLI
+
+To run as a command line app:
+
+`npm link`
+
+Then you can run the command as `api-key-helper`.
