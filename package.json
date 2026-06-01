@@ -12,6 +12,10 @@
         "type": "git",
         "url": "https://github.com/jf990/api-key-cli.git"
     },
+    "bugs": {
+        "url": "https://github.com/jf990/api-key-cli/issues"
+    },
+    "homepage": "https://github.com/jf990/api-key-cli#readme",
     "scripts": {
         "start": "node ./source/index.js",
         "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"

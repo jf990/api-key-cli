@@ -18,6 +18,8 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
 
 ## Set up
 
+[Node.js](https://nodejs.org) is required.
+
 1. Run `npm install` to install the project dependencies.
 
 2. Create or edit `.env` to set your ArcGIS account credentials. See `.env.sample` for a sample. Edit this file with your information and save it as `.env`.
