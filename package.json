@@ -10,7 +10,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/jf990/api-key-cli.git"
+        "url": "git+https://github.com/jf990/api-key-cli.git"
     },
     "bugs": {
         "url": "https://github.com/jf990/api-key-cli/issues"
