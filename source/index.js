@@ -12,6 +12,7 @@ import { ArcGISIdentityManager } from "@esri/arcgis-rest-request";
 import { createServiceUsageReport } from "./usageReport.js";
 import { ArcGISPrivileges, getAuthenticationItems, updatePortalItem, getPortalItem, deletePortalItem } from "./arcGISItemHelpers.js";
 import {
+    log,
     getAccessTokenParameter,
     getItemIDParameter,
     dateFromOptions,
@@ -22,7 +23,8 @@ import {
     saveJSONFile,
     saveCSVFile,
     getRelativeExpireDate,
-    normalizeItemType
+    normalizeItemType,
+    geocodeAddress
 } from "./utils.js";
 import fsExtra from "fs-extra";
 import YAML from "yaml";
@@ -34,29 +36,9 @@ import { fileURLToPath } from "url";
 let showVerbose = false;
 
 /**
- * Handle logging with different levels and output destinations.
- * Levels are "error", "warn", "info", "data", and "success".
- * @param {string} message A message to send to the log.
- * @param {string} level How to consider the logged message.
- */
-function log(message, level = "info") {
-    if (level === "error") {
-        console.error(chalk.red(message));
-    } else if (level === "warn") {
-        console.warn(chalk.yellow(message));
-    } else if (level === "info" && showVerbose) {
-        console.log(chalk.blue(message));
-    } else if (level === "data") {
-        console.log(message);
-    } else if (showVerbose){
-        console.log(chalk.green(message));
-    }
-}
-
-/**
  * Pick up command line arguments and invoke the requested tasks. See the README for details on command line arguments.
  */
-function performRequestAction() {
+async function performRequestAction() {
     dotenv.config();
     const args = getCommandLineParameters();
     const action = args.a ?? "help";
@@ -115,6 +97,11 @@ function performRequestAction() {
       case "regen":
         // generate new tokens for api key 1, 2 or both, given the item ID.
         regenerateAPIKey(args);
+        break;
+      case "geocode":
+        // geocode an address
+        const a = await geocodeAddress(getAccessTokenParameter(args), args.s ?? "");
+        log(`Geocode result: ${JSON.stringify(a)}`, "data");
         break;
       case "help":
         log(`ArcGIS API key helper\nUsage: api-key-helper -a [action] [options]`, "warn");

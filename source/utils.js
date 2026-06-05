@@ -6,6 +6,26 @@ import chalk from "chalk";
 import fsExtra from "fs-extra";
 
 /**
+ * Handle logging with different levels and output destinations.
+ * Levels are "error", "warn", "info", "data", and "success".
+ * @param {string} message A message to send to the log.
+ * @param {string} level How to consider the logged message.
+ */
+function log(message, level = "info") {
+    if (level === "error") {
+        console.error(chalk.red(message));
+    } else if (level === "warn") {
+        console.warn(chalk.yellow(message));
+    } else if (level === "info" && showVerbose) {
+        console.log(chalk.blue(message));
+    } else if (level === "data") {
+        console.log(message);
+    } else if (showVerbose){
+        console.log(chalk.green(message));
+    }
+}
+
+/**
  * Get the access token from either the environment variable ARCGIS_TOKEN or command line argument -t.
  * @param {object} args Command line arguments object
  * @returns {string} access token or empty string if none.
@@ -191,7 +211,55 @@ function normalizeItemType(type, typeKeywords) {
     return type;
 }
 
+/**
+ * Geocode an address using ArcGIS World Geocoding Service and return coordinates.
+ * @param {string} apiKey ArcGIS API key.
+ * @param {string} addressString Single-line address to geocode.
+ * @returns {Promise<object>} Coordinates object with longitude/latitude and x/y values.
+ */
+async function geocodeAddress(apiKey, addressString) {
+    if (isEmpty(apiKey)) {
+        return {"status": 400, "error": "Missing API key."};
+    }
+    if (isEmpty(addressString)) {
+        return {"status": 400, "error": "Missing address string."};
+    }
+
+    const endpoint = "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates";
+    const params = new URLSearchParams({
+        f: "json",
+        singleLine: addressString,
+        outFields: "Match_addr,Addr_type",
+        maxLocations: "1",
+        token: apiKey
+    });
+
+    const response = await fetch(`${endpoint}?${params.toString()}`);
+    if (!response.ok) {
+        return {"status": response.status, "error": `Geocode request failed with status ${response.status}.`};
+    }
+
+    const geocodeData = await response.json();
+    if (geocodeData.error) {
+        return {"status": 500, "error": geocodeData.error.message ?? "Geocode request failed."};
+    }
+
+    const firstCandidate = geocodeData.candidates?.[0];
+    if (!firstCandidate?.location) {
+        return {"status": 404, "error": "No geocode candidates found for the provided address."};
+    }
+
+    return {
+        address: firstCandidate.address ?? addressString,
+        x: firstCandidate.location.x,
+        y: firstCandidate.location.y,
+        longitude: firstCandidate.location.x,
+        latitude: firstCandidate.location.y
+    };
+}
+
 export {
+    log,
     getAccessTokenParameter,
     getItemIDParameter,
     dateFromOptions,
@@ -201,6 +269,7 @@ export {
     sleeper,
     isNumeric,
     normalizeItemType,
+    geocodeAddress,
     saveJSONFile,
     saveCSVFile
 }
