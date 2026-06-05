@@ -1,6 +1,6 @@
 {
     "name": "@jf990/api-key-cli",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "CLI app to provide various helpers for working with ArcGIS API keys",
     "main": "source/index.js",
     "type": "module",
@@ -46,6 +46,6 @@
         "yargs": "^18.0.0"
     },
     "devDependencies": {
-        "jest": "^29.7.0"
+        "jest": "^30.4.2"
     }
 }
