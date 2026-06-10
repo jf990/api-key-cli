@@ -4,6 +4,7 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 
 - Get a list of your API keys and OAuth apps.
 - Get a report of your API key and OAuth app service usage.
+- Get a list of your API keys that are about to expire.
 - Revoke keys.
 - Regenerate keys.
 - Update the item meta data.
@@ -31,16 +32,20 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
 * ✅ `-a genkeys`: generate new API keys using API key options template (see YAML file format below).
     `-n` numberOfKeys
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), default is `./api-key-attributes.yaml`
-    `-f` output format CSV|JSON|table
-    `-o` output file path, if empty then STDOUT
+    `-f` output format CSV|JSON|STDOUT
+    `-o` output file path, if empty and not STDOUT then "api-keys"
 * ✅ `-a inspect`: show properties for a single api key.
     `-t` token or an existing API key access token or user OAuth access token
     `-i` itemId and ArcGIS portal item identifier
-    `-f` output format CSV|JSON|table
-    `-o` output file path, if empty then STDOUT
+    `-f` output format CSV|JSON|STDOUT
+    `-o` output file path, if empty and not STDOUT then "api-keys"
 * ✅ `-a report`: generate API keys report as CSV file.
-    `-o` output file path, if empty then STDOUT
-    `-f` output format CSV|JSON|table
+    `-f` output format CSV|JSON|STDOUT
+    `-o` output file path, if empty and not STDOUT then "api-keys"
+* ✅ `-a expire`: generate API keys report ordered by expiration date.
+    `-d` date or daysUntilExpiration, default is 30
+    `-f` output format CSV|JSON|STDOUT
+    `-o` output file path, if empty and not STDOUT then "api-keys-expiration"
 * ✅ `-a revoke`: revoke a token on an existing api key.
     `-i` ArcGIS portal item identifier of the API key to revoke
     `-k` 1|2|all for which token to revoke, token 1, 2 or all tokens

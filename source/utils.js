@@ -4,6 +4,11 @@
  */
 import chalk from "chalk";
 import fsExtra from "fs-extra";
+let showVerbose = false;
+
+function setVerbose(verbose) {
+    showVerbose = verbose;
+}
 
 /**
  * Handle logging with different levels and output destinations.
@@ -259,6 +264,7 @@ async function geocodeAddress(apiKey, addressString) {
 }
 
 export {
+    setVerbose,
     log,
     getAccessTokenParameter,
     getItemIDParameter,

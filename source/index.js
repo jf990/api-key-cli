@@ -7,11 +7,22 @@
  * Issues:
  * - report gives error "Report generation failed: ArcGISRequestError: HTTP 498: Unknown"
  */
+import path from "path";
 import { createApiKey, updateApiKey, invalidateApiKey, getApiKey } from '@esri/arcgis-rest-developer-credentials';
 import { ArcGISIdentityManager } from "@esri/arcgis-rest-request";
 import { createServiceUsageReport } from "./usageReport.js";
-import { ArcGISPrivileges, getAuthenticationItems, updatePortalItem, getPortalItem, deletePortalItem } from "./arcGISItemHelpers.js";
+import { 
+    ArcGISPrivileges,
+    getAuthenticationItems,
+    getAPIKeyItems,
+    getUserAuthenticationItems,
+    getUserAPIKeyItems,
+    updatePortalItem,
+    getPortalItem,
+    deletePortalItem
+} from "./arcGISItemHelpers.js";
 import {
+    setVerbose,
     log,
     getAccessTokenParameter,
     getItemIDParameter,
@@ -45,6 +56,7 @@ async function performRequestAction() {
     let outputFile;
     let outputFileFormat;
     showVerbose = args.v ?? false;
+    setVerbose(showVerbose);
 
     switch(action) {
       case "genkeys":
@@ -52,8 +64,8 @@ async function performRequestAction() {
         const numberOfKeys = args.n ?? 1;
         const optionsFile = args.c ?? "./api-key-attributes.yaml";
         const sessionApiKeyOptions = loadOptions(optionsFile);
-        outputFile = args.o ?? "api-keys.csv";
         outputFileFormat = args.f ?? "csv";
+        outputFile = args.o ?? "api-keys";
         if (sessionApiKeyOptions) {
             log(`generate ${numberOfKeys} keys with options ${optionsFile} that will expire on ${sessionApiKeyOptions.apiToken1ExpirationDate}`, "info");
             createNewAPIKeys(sessionApiKeyOptions, numberOfKeys, outputFile, outputFileFormat);
@@ -61,15 +73,23 @@ async function performRequestAction() {
         break;
       case "report":
         // generate a report of all developer credentials
-        outputFile = args.o ?? "./api-keys.yaml";
         outputFileFormat = args.f ?? "csv";
+        outputFile = args.o ?? "./api-keys";
         usageReport(outputFile, outputFileFormat);
+        break;
+      case "expire":
+        // generate a report of all developer credentials in order of expiration date.
+        expirationReport(
+            args.d ?? 30,
+            args.o ?? "./api-keys-expiration",
+            args.f ?? "csv"
+        );
         break;
       case "inspect":
         // inspect properties of a single api key
         const token = getAccessTokenParameter(args);
-        outputFile = args.o ?? "stdout";
         outputFileFormat = args.f ?? "json";
+        outputFile = args.o ?? "stdout";
         if (token != "") {
             inspectAPIKeyToken(token, outputFile, outputFileFormat.toLowerCase());
         } else {
@@ -107,6 +127,7 @@ async function performRequestAction() {
         log(`ArcGIS API key helper\nUsage: api-key-helper -a [action] [options]`, "warn");
         log(`.    : -a inspect -i <item-id>`, "warn");
         log(`.    : -a inspect -t <token>`, "warn");
+        log(`.    : -a expire -d <days|date> -o <output-file> -f <output-format>`, "warn");
         log(`.    : -a report -o <output-file> -f <output-format>`, "warn");
         log(`.    : -a update -i <item-id> -c <options-file>`, "warn");
         log(`.    : -a delete -i <item-id>`, "warn");
@@ -117,6 +138,33 @@ async function performRequestAction() {
       default:
         log(`Unknown action ${action}. Action is required. Valid actions are genkeys, report, inspect, update, delete, revoke. Try -h for help.`, "error");
         break;
+    }
+}
+
+/**
+ * Normalize the handing of the output desitination and format so that we can easily output to the console (STDOUT)
+ * or to a file in either JSON or CSV format.
+ * @param {object|Array} results Data to save to output destination.
+ * @param {string} outputFile Output file name. Ignored if format is stdout.
+ * @param {string} outputFileFormat Supported output formats are json|csv|stdout, the default is csv.
+ */
+function outputResults(results, outputFile, outputFileFormat) {
+    let outputFormat = outputFileFormat.toLowerCase();
+    if (["json", "csv", "stdout"].indexOf(outputFormat) < 0) {
+        outputFormat = "csv";
+    }
+    if (outputFormat === "json") {
+        if (path.extname(outputFile).toLowerCase() === "") {
+            outputFile += ".json";
+        }
+        saveJSONFile(results, outputFile);
+    } else if (outputFormat === "csv") {
+        if (path.extname(outputFile).toLowerCase() === "") {
+            outputFile += ".csv";
+        }
+        saveCSVFile(results, outputFile);
+    } else {
+        log(JSON.stringify(results, null, 2), "data");
     }
 }
 
@@ -209,40 +257,6 @@ function signIn() {
 }
 
 /**
- * Get a collection of the user's authentication items. These are content items that are API keys
- * and OAuth 2 apps belonging to the user's account.
- * @param {ArcGISIdentityManager} authentication The authentication object of the logged in user.
- * @returns {Promise} Resolves with the array of items.
- */
-function getUserAuthenticationItems(authentication) {
-    return new Promise(function(resolve, reject) {
-        getAuthenticationItems(authentication)
-        .then(function(items) {
-            let filteredItems = [];
-            items.forEach(function(item) {
-                filteredItems.push({
-                    id: item.id,
-                    title: item.title,
-                    description: item.description,
-                    snippet: item.snippet,
-                    type: item.type,
-                    typeKeywords: item.typeKeywords,
-                    created: item.created,
-                    modified: item.modified,
-                    tags: item.tags,
-                    apiToken1ExpirationDate: item.apiToken1ExpirationDate,
-                    apiToken2ExpirationDate: item.apiToken2ExpirationDate
-                });
-            });
-            resolve(filteredItems);
-        })
-        .catch(function(exception) {
-            reject(exception);
-        });
-    });
-}
-
-/**
  * Generate a usage report of all developer credentials for the logged in user.
  * @param {string} outputFile Path to save the report CSV file.
  * @param {string} outputFileFormat Format of the output file (e.g., "csv" or "json").
@@ -267,11 +281,7 @@ async function usageReport(outputFile, outputFileFormat) {
                             apiToken2ExpirationDate: localDateFormat(item.apiToken2ExpirationDate)
                         });
                     });
-                    if (outputFileFormat.toLowerCase() === "json") {
-                        saveJSONFile(reducedItems, outputFile);
-                    } else {
-                        saveCSVFile(reducedItems, outputFile);
-                    }
+                    outputResults(reducedItems, outputFile, outputFileFormat);
                     createUsageReport(authentication)
                     .then(function() {
                         log("done.", "success");
@@ -279,6 +289,71 @@ async function usageReport(outputFile, outputFileFormat) {
                     .catch(function(exception) {
                         log("Report generation failed: " + exception.toString(), "error");
                     });
+                });
+            } else {
+                log("Login error: invalid login.", "error");
+                process.exit(91);
+            }
+        })
+        .catch(function(loginError) {
+            log("Login error: " + loginError.toString(), "error");
+            process.exit(92);
+        });
+    } catch (loginError) {
+        log("Login error: " + loginError.toString(), "error");
+        process.exit(93);
+    }
+}
+
+/**
+ * Generate a expiration report of all API keys that will expire within a certain number of days, sorted by expiration date.
+ * @param {integer|string} expireDate Number of days until expiration, or specific date, to use as a cutoff for the report. For example, if 30 is passed, the report will include all API keys that have an expiration date within the next 30 days.
+ * @param {string} outputFile Path to save the report CSV file.
+ * @param {string} outputFileFormat Format of the output file (e.g., "csv" or "json").
+ */
+async function expirationReport(expireDate, outputFile, outputFileFormat) {
+    try {
+        signIn()
+        .then(function(authentication) {
+            if (authentication && authentication.username) {
+                getUserAPIKeyItems(authentication)
+                .then(function(items) {
+                    log(`${process.env.ARCGIS_USER_NAME} has ${items.length} developer credentials:`, "info");
+                    if (isNumeric(expireDate)) {
+                        if (expireDate < 366) {
+                            // convert number of days to a date
+                            expireDate = getRelativeExpireDate(expireDate);
+                        }
+                    } else {
+                        expireDate = new Date(expireDate).getTime();
+                    }
+                    const reducedItems = [];
+                    items.forEach(function(item) {
+                        const itemType = normalizeItemType(item.type, item.typeKeywords);
+                        if (itemType.toLowerCase().startsWith("api key")) {
+                            let sortDate = item.apiToken1ExpirationDate > item.apiToken2ExpirationDate ? item.apiToken1ExpirationDate : item.apiToken2ExpirationDate;
+                            if (sortDate > 1 && sortDate < expireDate) {
+                                const dateDiff = Math.abs(sortDate - Date.now()); 
+                                const days = Math.floor(dateDiff / 86400000);
+                                const expireMessage = sortDate > Date.now() ? localDateFormat(sortDate) + " (in " + days + " days)" : "EXPIRED";
+                                reducedItems.push({
+                                    itemId: item.id,
+                                    title: item.title,
+                                    type: itemType,
+                                    expires: expireMessage,
+                                    created: localDateFormat(item.created),
+                                    modified: localDateFormat(item.modified),
+                                    sortDate: sortDate,
+                                    apiToken1ExpirationDate: localDateFormat(item.apiToken1ExpirationDate),
+                                    apiToken2ExpirationDate: localDateFormat(item.apiToken2ExpirationDate)
+                                });
+                            }
+                            reducedItems.sort(function(a, b) {
+                                return a.sortDate - b.sortDate;
+                            });
+                        }
+                    });
+                    outputResults(reducedItems, outputFile, outputFileFormat);
                 });
             } else {
                 log("Login error: invalid login.", "error");
@@ -329,11 +404,7 @@ async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputF
                             privileges: apiKeyOptions.privileges
                         });
                         if (newKeys.length >= numberOfKeys) {
-                            if (outputFileFormat.toLowerCase() === "json") {
-                                saveJSONFile(newKeys, outputFile);
-                            } else {
-                                saveCSVFile(newKeys, outputFile);
-                            }
+                            outputResults(newKeys, outputFile, outputFileFormat);
                         }
                     }).catch(function(error) {
                         log(`createAPIKey error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");

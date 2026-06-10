@@ -5,6 +5,7 @@
  */
 import { searchItems, SearchQueryBuilder, createItem, updateItem, getItem, removeItem } from "@esri/arcgis-rest-portal";
 import { request } from "@esri/arcgis-rest-request";
+import { log } from "./utils.js";
 
 const ArcGISPrivileges = {
     basemaps:               "premium:user:basemaps",
@@ -92,7 +93,7 @@ function verifyAPIKeyOptions(options) {
             }
         }
         if (errorList.length > 0) {
-            console.error(errorList);
+            log(errorList, "error");
         }
     }
     return isValid;
@@ -125,6 +126,9 @@ async function getAuthenticationItems(authentication) {
               .or()
               .match("Registered App")
               .in("typekeywords")
+              .or()
+              .match("APIToken")
+              .in("typekeywords")
             .endGroup();
 
             const options = {
@@ -135,7 +139,7 @@ async function getAuthenticationItems(authentication) {
                 sortField: "created",
                 sortOrder: "desc"
             };
-            console.log(`Querying for items ${startItem} to ${startItem + pageSize - 1}...`);
+            log(`Querying for items ${startItem} to ${startItem + pageSize - 1}...`, "info");
             searchItems(options)
             .then(function(response) {
                 resolve(response.results);
@@ -165,6 +169,143 @@ async function getAuthenticationItems(authentication) {
             }
         }
         resolve(allItems);
+    });
+}
+
+/**
+ * Get a list of the logged in user's API keys as an array of items. This is
+ * done using the portal search API https://developers.arcgis.com/rest/users-groups-and-items/search.htm.
+ * @param {ArcGISIdentityManager} authentication Identity of the logged in user.
+ * @returns {Promise} Resolves with the array of items.
+ */
+async function getAPIKeyItems(authentication) {
+    const pageSize = 10;
+
+    function getPageOfAPIKeyItems(page) {
+        let startItem;
+        if (page < 2) {
+            startItem = 1;
+        } if (page > 1) {
+            startItem = ((page - 1) * pageSize) + 1;
+        }
+        return new Promise(function (resolve, reject) {
+            const query = new SearchQueryBuilder()
+            .match(authentication.username)
+            .in("owner")
+            .and()
+            .startGroup()
+              .match("APIToken")
+              .in("typekeywords")
+            .endGroup();
+
+            const options = {
+                authentication: authentication,
+                q: query,
+                start: startItem,
+                num: pageSize,
+                sortField: "created",
+                sortOrder: "desc"
+            };
+            log(`Querying for items ${startItem} to ${startItem + pageSize - 1}...`, "info");
+            searchItems(options)
+            .then(function(response) {
+                resolve(response.results);
+            })
+            .catch(function(exception) {
+                reject(exception);
+            });    
+        });
+    }
+    return new Promise(async function(resolve, reject) {
+        let nextPage = 0;
+        let allItems = [];
+
+        // Query for items until we get less than a full page of items.
+        while (true) {
+            nextPage += 1;
+            try {
+                let items = await getPageOfAPIKeyItems(nextPage);
+                allItems = allItems.concat(items);
+                if (items.length < pageSize || nextPage > 100) { // if we got less than a full page, or we've paged through 100 pages (1000 items, which is likely more items than any user has), then stop paging and return what we have.
+                    resolve(allItems);
+                    return;
+                }
+            } catch (exception) {
+                reject(exception);
+                return;
+            }
+        }
+        resolve(allItems);
+    });
+}
+
+/**
+ * Get a collection of the user's authentication items. These are content items that are API keys
+ * and OAuth 2 apps belonging to the user's account.
+ * @param {ArcGISIdentityManager} authentication The authentication object of the logged in user.
+ * @returns {Promise} Resolves with the array of items.
+ */
+function getUserAuthenticationItems(authentication) {
+    return new Promise(function(resolve, reject) {
+        getAuthenticationItems(authentication)
+        .then(function(items) {
+            let filteredItems = [];
+            items.forEach(function(item) {
+                filteredItems.push({
+                    id: item.id,
+                    title: item.title,
+                    description: item.description,
+                    snippet: item.snippet,
+                    type: item.type,
+                    typeKeywords: item.typeKeywords,
+                    created: item.created,
+                    modified: item.modified,
+                    tags: item.tags,
+                    apiToken1ExpirationDate: item.apiToken1ExpirationDate,
+                    apiToken2ExpirationDate: item.apiToken2ExpirationDate
+                });
+            });
+            resolve(filteredItems);
+        })
+        .catch(function(exception) {
+            reject(exception);
+        });
+    });
+}
+
+/**
+ * Get a collection of the user's API keys.
+ * @param {ArcGISIdentityManager} authentication The authentication object of the logged in user.
+ * @returns {Promise} Resolves with the array of items.
+ */
+async function getUserAPIKeyItems(authentication) {
+    return new Promise(function(resolve, reject) {
+        getAPIKeyItems(authentication)
+        .then(function(items) {
+            let filteredItems = [];
+            items.forEach(async function(item) {
+                const itemDetails = await getItem(item.id, { authentication });
+                filteredItems.push({
+                    id: itemDetails.id,
+                    title: itemDetails.title,
+                    description: itemDetails.description,
+                    snippet: itemDetails.snippet,
+                    type: itemDetails.type,
+                    typeKeywords: itemDetails.typeKeywords,
+                    created: itemDetails.created,
+                    modified: itemDetails.modified,
+                    tags: itemDetails.tags,
+                    apiToken1ExpirationDate: itemDetails.apiToken1ExpirationDate,
+                    apiToken2ExpirationDate: itemDetails.apiToken2ExpirationDate
+                });
+                if (filteredItems.length == items.length) {
+                    resolve(filteredItems);
+                }
+            });
+        })
+        .catch(function(exception) {
+            reject(exception);
+        });
     });
 }
 
@@ -249,6 +390,9 @@ function registerAPIKeyApp(itemId, itemOptions, authentication) {
 export {
     ArcGISPrivileges,
     getAuthenticationItems,
+    getUserAuthenticationItems,
+    getAPIKeyItems,
+    getUserAPIKeyItems,
     createPortalItem,
     updatePortalItem,
     getPortalItem,
