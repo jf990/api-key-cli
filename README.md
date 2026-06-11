@@ -106,8 +106,20 @@ options:
 
 ### CLI
 
-To run as a command line app:
+There are two ways to run this as a command line app.
+
+1. Local project
+
+When you have this project installed locally and you successfully completed `npm install`, then:
 
 `npm link`
 
-Then you can run the command as `api-key-helper`.
+Then you can run the command as `api-key-cli`.
+
+2. Global install
+
+When you don't have this project installed locally, then:
+
+`npm install -g api-key-cli`
+
+Then you can run the command as `api-key-cli`.
