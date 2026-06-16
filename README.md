@@ -123,3 +123,9 @@ When you don't have this project installed locally, then:
 `npm install -g api-key-cli`
 
 Then you can run the command as `api-key-cli`.
+
+3. npx
+
+CLI tool and package runner
+
+`npx api-key-cli ...`
