@@ -124,7 +124,8 @@ async function performRequestAction() {
         log(`Geocode result: ${JSON.stringify(a)}`, "data");
         break;
       case "help":
-        log(`ArcGIS API key helper\nUsage: api-key-helper -a [action] [options]`, "warn");
+        const version = process.env.npm_package_version;
+        log(`ArcGIS API key helper version ${version}\nUsage: api-key-helper -a [action] [options]`, "warn");
         log(`.    : -a inspect -i <item-id>`, "warn");
         log(`.    : -a inspect -t <token>`, "warn");
         log(`.    : -a expire -d <days|date> -o <output-file> -f <output-format>`, "warn");
@@ -134,6 +135,8 @@ async function performRequestAction() {
         log(`.    : -a revoke -i <item-id>`, "warn");
         log(`.    : -a regen -i <item-id> -t <token>`, "warn");
         log(`.    : -a genkeys -n <number-of-keys> -c <options-file> -o <output-file> -f <output-format>`, "warn");
+        log(`.    : -v`, "warn");
+        log(`.    : -h`, "warn");
         break;
       default:
         log(`Unknown action ${action}. Action is required. Valid actions are genkeys, report, inspect, update, delete, revoke. Try -h for help.`, "error");

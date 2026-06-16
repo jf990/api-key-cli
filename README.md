@@ -106,7 +106,7 @@ options:
 
 ### CLI
 
-There are two ways to run this as a command line app.
+There are three ways to run this as a command line app. Note that in all cases you will need a `.env` file in your current directory if credentials are requrired (See `.env.sample` for the expected format).
 
 1. Local project
 
