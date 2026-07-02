@@ -9,6 +9,7 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 - Regenerate keys.
 - Update the item meta data.
 - Create new keys.
+- Inspect a key or portal item to determine what attributes it has.
 
 ## Accounts
 
@@ -97,6 +98,15 @@ options:
   apiToken2ExpirationDate: - same as `apiToken1ExpirationDate` for access token 2.
   apiToken2ExpirationDays: - same as `apiToken1ExpirationDays` for access token 2.
 ```
+
+### Exit codes
+
+STDOUT and STDERR are honored for logged messages and errors, respectively. The tool returns an exit code that can be used to chain commands.
+
+- 0: normal exit, operation completed without error (does not always mean it was successful, depending on the request).
+- 90: service error, the request failed, additional details logged to STDERR.
+- 98: authentication error, login failed, invalid access token.
+- 99: invalid parameter. An argument you supplied could not be coerced to a valid parameter for the requested operation.
 
 ### Test cases
 

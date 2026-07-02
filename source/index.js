@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * Generate usage reports of your ArcGIS Platform authentication (OAuth apps and API keys.)
- * Report generation requires a logged in user. Update .env with your credentials and make
+ * ArcGIS API key helper CLI tool to help manage your ArcGIS Platform developer credentials
+ * (API keys and OAuth apps) in a way friendly to CLI apps and CI/CD workflows.
+ * - inspect API key tokens and Developer Credential portal items.
+ * - check expire dates.
+ * - update developer credential portal item meta data (title, summary, tags, privileges, referrers, redirect URIs.)
+ * - delete developer credential portal items.
+ * - revoke access tokens.
+ * - regenerate access tokens.
+ * - create new API keys.
+ * - Generate usage reports of your ArcGIS Platform authentication (OAuth apps and API keys.)
+ *
+ * Requires a logged in ArcGIS user. Update .env with your credentials and make
  * sure to keep that file secure.
- * 
- * Issues:
- * - report gives error "Report generation failed: ArcGISRequestError: HTTP 498: Unknown"
  */
 import path from "path";
 import { createApiKey, updateApiKey, invalidateApiKey, getApiKey } from '@esri/arcgis-rest-developer-credentials';
@@ -69,6 +76,8 @@ async function performRequestAction() {
         if (sessionApiKeyOptions) {
             log(`generate ${numberOfKeys} keys with options ${optionsFile} that will expire on ${sessionApiKeyOptions.apiToken1ExpirationDate}`, "info");
             createNewAPIKeys(sessionApiKeyOptions, numberOfKeys, outputFile, outputFileFormat);
+        } else {
+            process.exit(99);
         }
         break;
       case "report":
@@ -98,7 +107,7 @@ async function performRequestAction() {
                 inspectAPIKeyItem(itemID, outputFile, outputFileFormat.toLowerCase());
             } else {
                 log("Inspect requires either a token (-t) or item id (-i) parameter.", "error");
-                process.exit(94);
+                process.exit(99);
             }
         }
         break;
@@ -122,6 +131,7 @@ async function performRequestAction() {
         // geocode an address
         const a = await geocodeAddress(getAccessTokenParameter(args), args.s ?? "");
         log(`Geocode result: ${JSON.stringify(a)}`, "data");
+        process.exit(0);
         break;
       case "help":
         const version = process.env.npm_package_version;
@@ -137,9 +147,11 @@ async function performRequestAction() {
         log(`.    : -a genkeys -n <number-of-keys> -c <options-file> -o <output-file> -f <output-format>`, "warn");
         log(`.    : -v`, "warn");
         log(`.    : -h`, "warn");
+        process.exit(0);
         break;
       default:
         log(`Unknown action ${action}. Action is required. Valid actions are genkeys, report, inspect, update, delete, revoke. Try -h for help.`, "error");
+        process.exit(99);
         break;
     }
 }
@@ -288,23 +300,25 @@ async function usageReport(outputFile, outputFileFormat) {
                     createUsageReport(authentication)
                     .then(function() {
                         log("done.", "success");
+                        process.exit(0);
                     })
                     .catch(function(exception) {
                         log("Report generation failed: " + exception.toString(), "error");
+                        process.exit(90);
                     });
                 });
             } else {
                 log("Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
@@ -357,19 +371,20 @@ async function expirationReport(expireDate, outputFile, outputFileFormat) {
                         }
                     });
                     outputResults(reducedItems, outputFile, outputFileFormat);
+                    process.exit(0);
                 });
             } else {
                 log("Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
@@ -408,6 +423,7 @@ async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputF
                         });
                         if (newKeys.length >= numberOfKeys) {
                             outputResults(newKeys, outputFile, outputFileFormat);
+                            process.exit(0);
                         }
                     }).catch(function(error) {
                         log(`createAPIKey error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");
@@ -419,34 +435,32 @@ async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputF
                 }
             } else {
                 log("createAPIKey Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("createAPIKey Login error: " + loginError.toString() + " Check your credentials.", "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("createAPIKey Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
 /**
  * Update an existing API key. @todo: untested!
- * @param {string} itemId of the portal item that holds the api key.
+ * Command line options
+ * -i: item ID (required)
+ * -t: title
+ * -d: description
+ * -k: tags, comma separated string, e.g. "tag1,tag2"
+ * -p: privileges to add, comma separated string, e.g. "basemaps,places"
+ * -r: referrers to add, comma separated string, e.g. "https://myapp.com/*"
+ * -u: redirect URIs to add, comma separated string, e.g. "https://myapp.com/callback"
+ * @param {object} args Command line arguments.
  */
 async function updateAPIKeyProperties(args) {
-    // Add places priv, remove referrers, update expire time
-    // Command line options
-    // -i: item ID (required)
-    // -t: title
-    // -d: description
-    // -k: tags, comma separated string, e.g. "tag1,tag2"
-    // -p: privileges to add, comma separated string, e.g. "basemaps,places"
-    // -r: referrers to add, comma separated string, e.g. "https://myapp.com/*"
-    // -u: redirect URIs to add, comma separated string, e.g. "https://myapp.com/callback"
-
     // based on the command line options determine if the item needs to be updated, or if the API key properties need to be updated,
     // as they are two different API calls.
     let hasAPIKeyUpdateOptions = false;
@@ -454,7 +468,7 @@ async function updateAPIKeyProperties(args) {
     const itemId = getItemIDParameter(args);
     if (isEmpty(itemId)) {
         log("updateAPIKey error: item ID is required.", "error");
-        process.exit(94);
+        process.exit(99);
     }
     let apiKeyOptions = {
         itemId: itemId,
@@ -504,42 +518,57 @@ async function updateAPIKeyProperties(args) {
     }
     try {
         signIn()
-        .then(function(authentication) {
+        .then(async function(authentication) {
             if (authentication && authentication.username) {
+                const updateTasks = [];
                 if (hasAPIKeyUpdateOptions) {
                     apiKeyOptions.authentication = authentication;
                     log(`updateAPIKey with options ${JSON.stringify(apiKeyOptions)}`, "info");
-                    updateApiKey(apiKeyOptions).then(function(registeredAPIKey) {
-                        log(`updateApiKey updated item ${itemId} with response ${JSON.stringify(registeredAPIKey)}`, "success");
-                    }).catch(function(error) {
-                        log(`updateAPIKey error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");
-                        process.exit(90);
-                    });
+                    updateTasks.push(
+                        updateApiKey(apiKeyOptions)
+                        .then(function(registeredAPIKey) {
+                            log(`updateAPIKey updated item ${itemId} with response ${JSON.stringify(registeredAPIKey)}`, "success");
+                        })
+                    );
                 }
                 if (hasItemUpdateOptions) {
                     // update the item title, description, or tags
                     itemUpdateOptions.id = itemId;
-                    updatePortalItem(itemId, itemUpdateOptions, authentication)
-                    .then(function(updatedItem) {
-                        log(`Updated item ${itemId} with response ${JSON.stringify(updatedItem)}`, "success");
-                    })
-                    .catch(function(error) {
-                        log(`updatePortalItem error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");
-                        process.exit(90);
-                    });
+                    updateTasks.push(
+                        updatePortalItem(itemId, itemUpdateOptions, authentication)
+                        .then(function(updatedItem) {
+                            log(`Updated item ${itemId} with response ${JSON.stringify(updatedItem)}`, "success");
+                        })
+                    );
                 }
+
+                const updateResults = await Promise.allSettled(updateTasks);
+                const failedUpdates = updateResults.filter(function(result) {
+                    return result.status === "rejected";
+                });
+
+                // Determine if any of the updates failed and log the errors and exit code.
+                if (failedUpdates.length > 0) {
+                    failedUpdates.forEach(function(result) {
+                        const error = result.reason ?? {};
+                        log(`update error ${error.code}: ${error.originalMessage ?? error.message} ${JSON.stringify(error.response)}`, "error");
+                    });
+                    process.exit(90);
+                }
+                // no failures, log success and exit.
+                process.exit(0);
             } else {
                 log("updateAPIKey Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("updateAPIKey Login error: " + loginError.toString() + " Check your credentials.", "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("updateAPIKey Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
@@ -556,6 +585,7 @@ async function updateAPIKeyProperties(args) {
                 deletePortalItem(itemID, authentication)
                 .then(function(serverResponse) {
                     log(`deleteItem says ` + JSON.stringify(serverResponse), "success");
+                    process.exit(0);
                 })
                 .catch(function(error) {
                     log("deleteItem error: " + error.toString(), "error");
@@ -563,16 +593,16 @@ async function updateAPIKeyProperties(args) {
                 })
             } else {
                 log("deleteItem Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("deleteItem Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("deleteItem Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
@@ -582,7 +612,6 @@ async function updateAPIKeyProperties(args) {
  * @param {string} token ArcGIS access token (API key or OAuth user token).
  * @param {string} outFile Optional. If provided, will save the output to a file instead of logging to the console. Default is "stdout".
  * @param {string} format Optional. If outputting to a file, can specify the format as "json" or "csv". Default is "json".
- * @returns {object|null} The app info details or null if there was an error.
  */
 async function inspectAPIKeyToken(token, outFile = "stdout", format = "json") {
     const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&token=";
@@ -596,12 +625,14 @@ async function inspectAPIKeyToken(token, outFile = "stdout", format = "json") {
                 }
             });
             if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status} ${response.statusText}`);
+                log(`Request failed with status ${response.status} ${response.statusText}`, "error");
+                process.exit(90);
             }
             const jsonResponse = await response.json();
             if (jsonResponse.error) {
                 // { error: { code: 498, message: 'Invalid token.', details: [] } }
                 log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+                process.exit(90);
             } else {
                 const reducedResponse = {
                     owner: jsonResponse.name,
@@ -620,15 +651,16 @@ async function inspectAPIKeyToken(token, outFile = "stdout", format = "json") {
                 } else {
                     log(JSON.stringify(reducedResponse, null, 2), "data");
                 }
+                process.exit(0);
             }
-            return jsonResponse;
         } catch (exception) {
             log(`inspectAPIKey request failed: ${exception.message}`, "error");
+            process.exit(90);
         }
     } else {
         log("inspectAPIKey requires a non-empty token.", "error");
+        process.exit(99);
     }
-    return null;
 }
 
 /**
@@ -637,7 +669,6 @@ async function inspectAPIKeyToken(token, outFile = "stdout", format = "json") {
  * @param {string} itemID ArcGIS item identifier.
  * @param {string} outFile Optional. If provided, will save the output to a file instead of logging to the console. Default is "stdout".
  * @param {string} format Optional. If outputting to a file, can specify the format as "json" or "csv". Default is "json".
- * @returns {object|null} The app info details or null if there was an error.
  */
 async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
     try {
@@ -673,7 +704,7 @@ async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
                     } else {
                         log(JSON.stringify(apiKeyInfo, null, 2), "data");
                     }
-                    return apiKeyInfo;
+                    process.exit(0);
                 })
                 .catch(function(error) {
                     log(`getApiKey error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");
@@ -681,16 +712,16 @@ async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
                 });
             } else {
                 log("inspectAPIKeyItem Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("inspectAPIKeyItem Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("inspectAPIKeyItem Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
@@ -714,8 +745,10 @@ async function revokeAPIKey(args) {
                     .then(function(apiKeyResponse) {
                         if (apiKeyResponse.success) {
                             log(`Token 1 revoked for item ${itemId}.`, "success");
+                            process.exit(0);
                         } else {
                             log(`Failed to revoke token 1 for item ${itemId}. Response: ${JSON.stringify(apiKeyResponse)}`, "error");
+                            process.exit(90);
                         }
                     })
                     .catch(function(error) {
@@ -732,8 +765,10 @@ async function revokeAPIKey(args) {
                     .then(function(apiKeyResponse) {
                         if (apiKeyResponse.success) {
                             log(`Token 2 revoked for item ${itemId}.`, "success");
+                            process.exit(0);
                         } else {
                             log(`Failed to revoke token 2 for item ${itemId}. Response: ${JSON.stringify(apiKeyResponse)}`, "error");
+                            process.exit(90);
                         }
                     })
                     .catch(function(error) {
@@ -743,22 +778,25 @@ async function revokeAPIKey(args) {
                 }
             } else {
                 log("revokeAPIKey Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("revokeAPIKey Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("revokeAPIKey Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
+/**
+ * generate new tokens for api key 1, 2 or both, given the item ID.
+ * command line options: -i itemID of the API key to update, -k 1/2/* for which token to regenerate, -d date or daysUntilExpiration for token 1, -e date or daysUntilExpiration for token 2.
+ * @param {object} args Command line arguments.
+ */
 async function regenerateAPIKey(args) {
-    // generate new tokens for api key 1, 2 or both, given the item ID.
-    // command line options: -i itemID of the API key to update, -k 1/2/* for which token to regenerate, -d date or daysUntilExpiration for token 1, -e date or daysUntilExpiration for token 2.
     try {
         signIn()
         .then(function(authentication) {
@@ -779,7 +817,8 @@ async function regenerateAPIKey(args) {
                     updateOptions.generateToken2 = true;
                     updateOptions.apiToken2ExpirationDate = dateFromOptions( ! isNumeric(token2Expiration) ? token2Expiration : "", isNumeric(token2Expiration) ? parseInt(token2Expiration) : 7);
                 }
-                updateApiKey(updateOptions).then(function(registeredAPIKey) {
+                updateApiKey(updateOptions)
+                .then(function(registeredAPIKey) {
                     const apiKeyResponse = {};
                     if (whichToken == "1" || whichToken == "all") {
                         apiKeyResponse.token1 = {
@@ -794,22 +833,23 @@ async function regenerateAPIKey(args) {
                         };
                     }
                     log(`Regenerated API key tokens for item ${itemId}: ${JSON.stringify(apiKeyResponse)}`, "success");
+                    process.exit(0);
                 }).catch(function(error) {
                     log(`regenerateAPIKey error ${error.code}: ${error.originalMessage} ${JSON.stringify(error.response)}`, "error");
                     process.exit(90);
                 });
             } else {
                 log("revokeAPIKey Login error: invalid login.", "error");
-                process.exit(91);
+                process.exit(98);
             }
         })
         .catch(function(loginError) {
             log("revokeAPIKey Login error: " + loginError.toString(), "error");
-            process.exit(92);
+            process.exit(98);
         });
     } catch (loginError) {
         log("revokeAPIKey Login error: " + loginError.toString(), "error");
-        process.exit(93);
+        process.exit(98);
     }
 }
 
