@@ -10,6 +10,7 @@
  * - regenerate access tokens.
  * - create new API keys.
  * - Generate usage reports of your ArcGIS Platform authentication (OAuth apps and API keys.)
+ * - Check assigned privileges match expected privilege set.
  *
  * Requires a logged in ArcGIS user. Update .env with your credentials and make
  * sure to keep that file secure.
@@ -24,6 +25,7 @@ import {
     getAPIKeyItems,
     getUserAuthenticationItems,
     getUserAPIKeyItems,
+    getSubscriptionPrivileges,
     updatePortalItem,
     getPortalItem,
     deletePortalItem
@@ -51,6 +53,7 @@ import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import chalk from "chalk";
 import { fileURLToPath } from "url";
+const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&token=";
 let showVerbose = false;
 
 /**
@@ -133,6 +136,10 @@ async function performRequestAction() {
         log(`Geocode result: ${JSON.stringify(a)}`, "data");
         process.exit(0);
         break;
+      case "privchk":
+        // check privileges of a single API key against the expected privilege set.
+        checkPrivileges(args);
+        break;
       case "help":
         const version = process.env.npm_package_version;
         log(`ArcGIS API key helper version ${version}\nUsage: api-key-helper -a [action] [options]`, "warn");
@@ -145,6 +152,7 @@ async function performRequestAction() {
         log(`.    : -a revoke -i <item-id>`, "warn");
         log(`.    : -a regen -i <item-id> -t <token>`, "warn");
         log(`.    : -a genkeys -n <number-of-keys> -c <options-file> -o <output-file> -f <output-format>`, "warn");
+        log(`.    : -a privchk -t <token> -p <privileges-list> -c <options-file>`, "warn");
         log(`.    : -v`, "warn");
         log(`.    : -h`, "warn");
         process.exit(0);
@@ -614,8 +622,6 @@ async function updateAPIKeyProperties(args) {
  * @param {string} format Optional. If outputting to a file, can specify the format as "json" or "csv". Default is "json".
  */
 async function inspectAPIKeyToken(token, outFile = "stdout", format = "json") {
-    const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&token=";
-
     if (token !== "") {
         try {
             const response = await fetch(`${serviceURL}${encodeURIComponent(token)}`, {
@@ -850,6 +856,105 @@ async function regenerateAPIKey(args) {
     } catch (loginError) {
         log("revokeAPIKey Login error: " + loginError.toString(), "error");
         process.exit(98);
+    }
+}
+
+/**
+ * Test to see if a given API key has the expected privileges. This is useful for CLI, CI/CD applications
+ * to check that an API key has the expected privileges assigned to it.
+ * @param {object} args Command line arguments.
+ */
+async function checkPrivileges(args) {
+    const token = getAccessTokenParameter(args);
+    const optionsFile = args.c ?? "";
+    const expectedPrivileges = args.p ?? "";
+    let privilegesList;
+    let subscriptionCheckPass = false;
+    if (isEmpty(token)) {
+        log("checkPrivileges error: token is required.", "error");
+        process.exit(99);
+    }
+    if (isEmpty(expectedPrivileges) && ! isEmpty(optionsFile)) {
+        // Read options file to get the list of privileges.
+        const options = loadOptions(optionsFile);
+        privilegesList = options?.privileges ?? [];
+        if (isEmpty(privilegesList)) {
+            log(`checkPrivileges error: no privileges found in ${optionsFile}.`, "error");
+            process.exit(99);
+        }
+    } else if ( ! isEmpty(expectedPrivileges)) {
+        // privilegesList is already set from the command line.
+        privilegesList = expectedPrivileges.trim();
+        if (privilegesList[0] === "[" && privilegesList[privilegesList.length - 1] === "]") {
+            // privilegesList is a JSON array string, parse it.
+            try {
+                privilegesList = JSON.parse(privilegesList);
+            } catch (exception) {
+                log(`checkPrivileges error: failed to parse privileges list as JSON array: ${exception.message}`, "error");
+                process.exit(99);
+            }
+        } else {
+            // privilegesList is a comma-separated string, split it into an array.
+            privilegesList = privilegesList.split(",").map(function(element) { return element.trim(); });
+        }
+    } else {
+        log("checkPrivileges error: either -p privileges list or -c options file with privileges array is required.", "error");
+        process.exit(99);
+    }
+    if (privilegesList.length === 0) {
+        log(`checkPrivileges error: no expected privileges found in -p or -c ${optionsFile}.`, "error");
+        process.exit(99);
+    }
+    try {
+        // verify the expected privileges are present on the subscription for the logged in user.
+        const authentication = await signIn();
+        if (authentication && authentication.username) {
+            const subscriptionPrivileges = await getSubscriptionPrivileges(authentication);
+            const missingPrivileges = privilegesList.filter(function(privilege) {
+                return ! subscriptionPrivileges.includes(privilege);
+            });
+            if (missingPrivileges.length > 0) {
+                subscriptionCheckPass = false;
+                log(`checkPrivileges: your subscription is missing privileges: ${missingPrivileges.join(", ")}`, "error");
+            } else {
+                subscriptionCheckPass = true;
+                log("checkPrivileges: all expected privileges are present on your subscription.", "success");
+            }
+        }
+        const response = await fetch(`${serviceURL}${encodeURIComponent(token)}`, {
+            method: "GET",
+            headers: {
+                Accept: "application/json"
+            }
+        });
+        if (!response.ok) {
+            log(`Request failed with status ${response.status} ${response.statusText}`, "error");
+            process.exit(90);
+        }
+        const jsonResponse = await response.json();
+        if (jsonResponse.error) {
+            // { error: { code: 498, message: 'Invalid token.', details: [] } }
+            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+            process.exit(90);
+        } else {
+            const actualPrivileges = jsonResponse.appInfo.privileges;
+            const missingPrivileges = privilegesList.filter(function(privilege) {
+                return ! actualPrivileges.includes(privilege);
+            });
+            if (missingPrivileges.length > 0) {
+                log(`checkPrivileges: your access token is missing privileges: ${missingPrivileges.join(", ")}`, "error");
+                process.exit(90);
+            } else if (subscriptionCheckPass) {
+                log("checkPrivileges: all expected privileges are present on access token and subscription.", "success");
+                process.exit(0);
+            } else {
+                log("checkPrivileges: all expected privileges are present on access token, but some are missing from subscription.", "error");
+                process.exit(90);
+            }
+        }
+    } catch (exception) {
+        log(`checkPrivileges request failed: ${exception.message}`, "error");
+        process.exit(90);
     }
 }
 

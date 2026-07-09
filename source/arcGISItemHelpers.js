@@ -3,13 +3,14 @@
  * getAuthenticationItems: get an array of the users authentication items (OAuth apps and API keys.)
  * createAPIKey: create a new API key.
  */
-import { searchItems, SearchQueryBuilder, createItem, updateItem, getItem, removeItem } from "@esri/arcgis-rest-portal";
-import { request } from "@esri/arcgis-rest-request";
+import { searchItems, SearchQueryBuilder, createItem, updateItem, getItem, removeItem, getSelf } from "@esri/arcgis-rest-portal";
+import { request, ArcGISIdentityManager } from "@esri/arcgis-rest-request";
 import { log } from "./utils.js";
 
 const ArcGISPrivileges = {
     basemaps:               "premium:user:basemaps",
     basemapsStatic:         "premium:user:staticbasemaptiles",
+    staticMaps:             "premium:user:staticMaps",
     places:                 "premium:user:places",
     geocodeStored:          "premium:user:geocode:stored",
     geocode:                "premium:user:geocode:temporary",
@@ -387,6 +388,23 @@ function registerAPIKeyApp(itemId, itemOptions, authentication) {
     return request(portalServiceUrl, apiKeyRequestOptions);
 }
 
+async function getSubscriptionPrivileges(authentication) {
+    if (! authentication || ! authentication.token) {
+        throw new Error("Authentication object with valid token is required to get subscription privileges.");
+    }
+    const userIdentity = await ArcGISIdentityManager.fromToken({
+        token: authentication.token,
+        expires: authentication.expires,
+        username: authentication.username,
+        portal: authentication.portal
+    });
+    const userInfo = await getSelf({ authentication: userIdentity });
+    if ( ! userInfo || ! userInfo.user || ! userInfo.user.privileges) {
+        throw new Error("Unable to retrieve user information or privileges from the portal, check your authentication token.");
+    }
+    return userInfo.user.privileges;
+}
+
 export {
     ArcGISPrivileges,
     getAuthenticationItems,
@@ -396,5 +414,6 @@ export {
     createPortalItem,
     updatePortalItem,
     getPortalItem,
-    deletePortalItem
+    deletePortalItem,
+    getSubscriptionPrivileges
 };

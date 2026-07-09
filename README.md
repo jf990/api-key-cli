@@ -11,6 +11,10 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 - Create new keys.
 - Inspect a key or portal item to determine what attributes it has.
 
+## Why
+
+Working with API keys and developer credentials is typically done with either the [ArcGIS Location Platform dashboard](https://location.arcgis.com/dashboard/), the [ArcGIS Online home app](https://org.maps.arcgis.com/home/content.html#my), or with the [REST API](https://developers.arcgis.com/rest/). These options do not provide enough flexibility to manage access tokens in bulk and do not provide means to script and automate such as in CI/CD use cases. This tool is designed to help reduce the effort to manage ArcGIS access tokens for scripting and CI/CD use cases.
+
 ## Accounts
 
 You need an ArcGIS account in order to use this tool. There are two possibilities:
@@ -24,9 +28,9 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
 
 1. Run `npm install` to install the project dependencies.
 
-2. Create or edit `.env` to set your ArcGIS account credentials. See `.env.sample` for a sample. Edit this file with your information and save it as `.env`.
+2. Create or edit `.env` to set your ArcGIS account credentials. See `.env.sample` for a sample and [details below](#env-tokens). Edit this file with your information and save it as `.env`.
 
-3. Run `npm start`
+3. Run `npm start`. When passing command line arguments you need to separate them with `--`, so for example `npm start -- -a inspect -f json -t {my-access-token}`. 
 
 ## Command line arguments
 
@@ -66,6 +70,10 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
     `-u` redirect URIs comma separated string
 * ✅ `-a delete`: delete an existing api key.
     `-i` ArcGIS portal item identifier of the API key to delete
+* ✅ `-a privchk`: check that a given API key has the required privileges assigned. Also verifies the subscription contains those requested privileges.
+    `-t` token or an existing API key access token
+    `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), expect to find the `privileges` array. If not provided will look at `-p` (at least one of -p or -c is required).
+    `-p` privileges list, a comma separated list of privileges. If not provided will look at `-c`.
 * `-v` verbose output, will send extra information to STDOUT. Will mess up CSV or JSON output when not saving to a file.
 * `--help` show help on CLI arguments.
 * `--version` show version information.
