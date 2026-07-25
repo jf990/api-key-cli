@@ -1,0 +1,2 @@
+options:
+  privileges: ["portal:user:allowBetaAccess", "premium:user:basemaps", "premium:user:networkanalysis:routing"]
