@@ -10,6 +10,8 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 - Update the item meta data.
 - Create new keys.
 - Inspect a key or portal item to determine what attributes it has.
+- Verify your ArcGIS subscription or an access token have the expected privileges.
+- Verify API key referrers.
 
 ## Why
 
@@ -44,6 +46,7 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
     `-i` itemId and ArcGIS portal item identifier
     `-f` output format CSV|JSON|STDOUT
     `-o` output file path, if empty and not STDOUT then "api-keys"
+    `-r` (optional) a referrer URL to match a referrer set on the API key.
 * ✅ `-a report`: generate API keys report as CSV file.
     `-f` output format CSV|JSON|STDOUT
     `-o` output file path, if empty and not STDOUT then "api-keys"
@@ -67,25 +70,34 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
     `-k` tags comma separated string
     `-p` privileges comma separated string
     `-r` referrers comma separated string
-    `-u` redirect URIs comma separated string
 * ✅ `-a delete`: delete an existing api key.
     `-i` ArcGIS portal item identifier of the API key to delete
 * ✅ `-a privchk`: check that a given API key has the required privileges assigned. Also verifies the subscription contains those requested privileges.
     `-t` token or an existing API key access token
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), expect to find the `privileges` array. If not provided will look at `-p` (at least one of -p or -c is required).
     `-p` privileges list, a comma separated list of privileges. If not provided will look at `-c`.
+    `-r` (optional) a referrer URL to match a referrer set on the API key.
+* ✅ `-a refchk`: check that a specific referrer is set on a given API key.
+    `-t` token or an existing API key access token.
+    `-r` a referrer URL to match a referrer set on the API key.
 * `-v` verbose output, will send extra information to STDOUT. Will mess up CSV or JSON output when not saving to a file.
-* `--help` show help on CLI arguments.
+* `-h` show help on CLI arguments.
 * `--version` show version information.
+
+### Referrer
+
+Certain operations will require a referrer to match a referrer URL that is set on the API key. Use the `-r` argument to provide a referrer to the request. Referrer URLs should be enclosed in double quotes. You can only specify one referrer this way, be sure to choose one that matches one set on the API key. You do not need to specify a referrer if no referrers are set on the key or if the referrer is set to "*".
+
+For example, if your API key has a referrer set to http://localhost, the request will fail if not issued from that referring URL. Therefore, run the inspect command with a referrer specific `api-key-cli -a inspect -r "http://localhost" -t YOUR_API_KEY`
 
 ## .env tokens
 
 Certain parameters can be sent in via environment variables. These will override a command line parameter or default. Create or edit a `.env` file using the `.env.sample` for a sample.
 
-- `ARCGIS_USER_NAME`: Set to the account user name of the account to use.
-- `ARCGIS_USER_PASSWORD`: Password to account.
-- `ARCGIS_TOKEN`: An ArcGIS access token or API key, this will override any `-t` CLI argument.
-- `ARCGIS_ITEM_ID`: An ArcGIS portal item identifier, this will override any `-i` CLI argument.
+- `ARCGIS_USER_NAME`: (required) Set to the account user name of the account to use.
+- `ARCGIS_USER_PASSWORD`: (required) Password to account.
+- `ARCGIS_TOKEN`: (optional) An ArcGIS access token or API key, this will override any `-t` CLI argument.
+- `ARCGIS_ITEM_ID`: (optional) An ArcGIS portal item identifier, this will override any `-i` CLI argument.
 
 ## API key attributes
 

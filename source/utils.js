@@ -3,7 +3,9 @@
  * @module utils
  */
 import chalk from "chalk";
+import path from "path";
 import fsExtra from "fs-extra";
+import YAML from "yaml";
 let showVerbose = false;
 
 function setVerbose(verbose) {
@@ -127,7 +129,6 @@ function localDateFormat(timestamp) {
     return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 }
 
-
 /**
  * Helper function to try to determine if a value is numeric. This is used to determine
  * whether or not to put quotes around values when saving CSV files, since if a string contains
@@ -146,16 +147,21 @@ function isNumeric(val) {
  * @param {string} filename Where to save the file.
  */
 async function saveJSONFile(fileData, filename) {
-    if (filename.toLowerCase() === "stdout") {
-        log(JSON.stringify(fileData, null, 2), "data");
-        return;
-    }
-    fsExtra.writeFile(filename, JSON.stringify(fileData, null, 2), function(error) {
-        if (error) {
-            log(`Cannot save JSON file: ${error.message}.`, "error");
-        } else {
-            log(`Data saved as ${filename}.`, "success");
+    return new Promise(function(resolve, reject) {
+        if (filename.toLowerCase() === "stdout") {
+            log(JSON.stringify(fileData, null, 2), "data");
+            resolve();
+            return;
         }
+        fsExtra.writeFile(filename, JSON.stringify(fileData, null, 2), function(error) {
+            if (error) {
+                log(`Cannot save JSON file: ${error.message}.`, "error");
+                reject(error);
+            } else {
+                log(`Data saved as ${filename}.`, "success");
+                resolve();
+            }
+        });
     });
 }
 
@@ -167,35 +173,40 @@ async function saveJSONFile(fileData, filename) {
  * @param {string} filename Where to save the file.
  */
 async function saveCSVFile(fileData, filename) {
-    let headers;
-    let rows;
-    if (Array.isArray(fileData) && fileData.length > 0) {
-        headers = Object.keys(fileData[0]).join(",");
-        rows = fileData.map(function(row) {
-            const numColumns = Object.keys(row).length;
-            let rowString = "";
-            Object.values(row).forEach(function(value, index) {
-                if ( ! isNumeric(value)) {
-                    value = `"${value}"`;
-                }
-                rowString += value + (index < numColumns - 1 ? "," : "");
-            });
-            return rowString;
-        }).join("\n");
-    } else if (typeof fileData === "object") {
-        headers = Object.keys(fileData).join(",");
-        rows = Object.values(fileData).join(",");
-    }
-    if (filename.toLowerCase() === "stdout") {
-        log(`${headers}\n${rows}`, "data");
-        return;
-    }
-    fsExtra.writeFile(filename, `${headers}\n${rows}`, function(error) {
-        if (error) {
-            log(`Cannot save CSV file: ${error.message}.`, "error");
-        } else {
-            log(`Data saved as ${filename}.`, "success");
+    return new Promise(function(resolve, reject) {
+        let headers;
+        let rows;
+        if (Array.isArray(fileData) && fileData.length > 0) {
+            headers = Object.keys(fileData[0]).join(",");
+            rows = fileData.map(function(row) {
+                const numColumns = Object.keys(row).length;
+                let rowString = "";
+                Object.values(row).forEach(function(value, index) {
+                    if ( ! isNumeric(value)) {
+                        value = `"${value}"`;
+                    }
+                    rowString += value + (index < numColumns - 1 ? "," : "");
+                });
+                return rowString;
+            }).join("\n");
+        } else if (typeof fileData === "object") {
+            headers = Object.keys(fileData).join(",");
+            rows = Object.values(fileData).join(",");
         }
+        if (filename.toLowerCase() === "stdout") {
+            log(`${headers}\n${rows}`, "data");
+            resolve();
+            return;
+        }
+        fsExtra.writeFile(filename, `${headers}\n${rows}`, function(error) {
+            if (error) {
+                log(`Cannot save CSV file: ${error.message}.`, "error");
+                reject(error);
+            } else {
+                log(`Data saved as ${filename}.`, "success");
+                resolve();
+            }
+        });
     });
 }
 
@@ -263,6 +274,100 @@ async function geocodeAddress(apiKey, addressString) {
     };
 }
 
+/**
+ * Append an access token to a URL as a query string parameter. If the URL already has
+ * a token parameter, it is replaced.
+ * @param {string} url Expected to be a valid URL.
+ * @param {string} token Access token.
+ * @returns {string} url with token appended as a query string parameter.
+ */
+function appendToken(url, token) {
+    const urlObj = new URL(url);
+    urlObj.searchParams.set("token", token);
+    return urlObj.toString();
+}
+
+/**
+ * Normalize the handing of the output destination and format so that we can easily output to the console (STDOUT)
+ * or to a file in either JSON or CSV format.
+ * @param {object|Array} results Data to save to output destination.
+ * @param {string} outputFile Output file name. Ignored if format is stdout.
+ * @param {string} outputFileFormat Supported output formats are json|csv|stdout, the default is csv.
+ */
+async function outputResults(results, outputFile, outputFileFormat) {
+    let outputFormat = outputFileFormat.toLowerCase();
+    if (["json", "csv", "stdout"].indexOf(outputFormat) < 0) {
+        outputFormat = "csv";
+    }
+    if (outputFormat === "stdout" || outputFile.toLowerCase() === "stdout") {
+        log(JSON.stringify(results, null, 2), "data");
+    } else if (outputFormat === "json") {
+        if (path.extname(outputFile).toLowerCase() === "") {
+            outputFile += ".json";
+        }
+        await saveJSONFile(results, outputFile);
+    } else if (outputFormat === "csv") {
+        if (path.extname(outputFile).toLowerCase() === "") {
+            outputFile += ".csv";
+        }
+        await saveCSVFile(results, outputFile);
+    } else {
+        log(JSON.stringify(results, null, 2), "data");
+    }
+}
+
+/**
+ * Read the options YAML file and validate and copy options into the options
+ * template used to create or update API keys.
+ * @param {string} filePath Path to a YAML file with API key option attributes.
+ * @return {object|null} an object created from the YAML data, or null if error.
+ */
+function loadOptions(filePath) {
+    let optionsFile;
+    try {
+        optionsFile = fsExtra.readFileSync(filePath, "utf8");
+    } catch (exception) {
+        log(`Error reading options file ${filePath}: ${exception.message}`, "error");
+    }
+    try {
+        const options = YAML.parse(optionsFile);
+        if (options) {
+            const apiKeyOptions = {
+                title: "",
+                description: "",
+                tags: [],
+                privileges: [],
+                httpReferrers: [],
+                redirect_uris: [],
+                generateToken1: false,
+                apiToken1ExpirationDate: "",
+                apiToken1ExpirationDays: 0,
+                generateToken2: false,
+                apiToken2ExpirationDate: "",
+                apiToken2ExpirationDays: 0,
+                authentication: null,
+            };
+            let localOptions = options.options ?? options;
+            apiKeyOptions.title = localOptions.title ?? "No title";
+            apiKeyOptions.description = localOptions.description ?? "No description provided.";
+            apiKeyOptions.tags = localOptions.tags ?? [];
+            apiKeyOptions.privileges = localOptions.privileges ?? [];
+            apiKeyOptions.httpReferrers = localOptions.referrers ?? [];
+            apiKeyOptions.redirect_uris = localOptions.redirect_uris ?? [];
+            apiKeyOptions.generateToken1 = localOptions.generateToken1 ?? true;
+            apiKeyOptions.apiToken1ExpirationDate = dateFromOptions(localOptions.apiToken1ExpirationDate ?? "", localOptions.apiToken1ExpirationDays ?? 0);
+            apiKeyOptions.generateToken2 = localOptions.generateToken2 ?? false;
+            apiKeyOptions.apiToken2ExpirationDate = dateFromOptions(localOptions.apiToken2ExpirationDate ?? "", localOptions.apiToken2ExpirationDays ?? 0);
+            return apiKeyOptions;
+        } else {
+            log(`Invalid or missing API key options in ${filePath}.`, "error");
+        }
+    } catch (exception) {
+        log(`Error parsing options file YAML: ${exception.message}`, "error");
+    }
+    return null;
+}
+
 export {
     setVerbose,
     log,
@@ -277,5 +382,8 @@ export {
     normalizeItemType,
     geocodeAddress,
     saveJSONFile,
-    saveCSVFile
+    saveCSVFile,
+    appendToken,
+    outputResults,
+    loadOptions
 }

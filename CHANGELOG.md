@@ -2,10 +2,12 @@
 
 This file tracks changes made by each version release.
 
-## v1.0.5 10-July-2026
+## v1.1.1 25-July-2026
 
 - Update/improve all exit codes ([#6](https://github.com/jf990/api-key-cli/issues/6)).
 - Add `-a privchk` command to match privileges expected on an API key and on the subscription ([#5](https://github.com/jf990/api-key-cli/issues/5)).
+- Add `-a refchk` command to match an expected referrer on an API key and it passes server validation ([#4](https://github.com/jf990/api-key-cli/issues/4)).
+- update certain commands (privchk, inspect) to accept a referrer argument -r to have the request include the referer header ([#8](https://github.com/jf990/api-key-cli/issues/8)).
 
 ## v1.0.2 10-June-2026
 
