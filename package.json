@@ -35,16 +35,16 @@
         "access": "public"
     },
     "dependencies": {
-        "@esri/arcgis-rest-developer-credentials": "^4.10.3",
-        "@esri/arcgis-rest-portal": "^4.10.3",
-        "@esri/arcgis-rest-request": "^4.10.3",
-        "chalk": "^5.6.2",
+        "@esri/arcgis-rest-developer-credentials": "^4.11.0",
+        "@esri/arcgis-rest-portal": "^4.11.0",
+        "@esri/arcgis-rest-request": "^4.11.0",
+        "chalk": "^6.0.0",
         "dotenv": "^17.4.2",
         "esm": "^3.2.25",
         "fs-extra": "^11.4.0",
         "path": "^0.12.7",
         "yaml": "^2.9.0",
-        "yargs": "^18.0.0"
+        "yargs": "^18.1.0"
     },
     "devDependencies": {
         "jest": "^30.4.2"
