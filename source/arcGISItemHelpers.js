@@ -58,6 +58,103 @@ const privilegeToEndpointMap = {
 };
 
 /**
+ * Define each ArcGIS domain based on staging environment and service type.
+ */
+const arcgisDomains = {
+    "prod": {
+        "basemaps": "basemaps-api.arcgis.com",
+        "basemap-styles": "basemapstyles-api.arcgis.com",
+        "elevation": "elevation-api.arcgis.com",
+        "enrichment": "geoenrich.arcgis.com",
+        "geocode": "geocode-api.arcgis.com",
+        "imagery": "ibasemaps-api.arcgis.com",
+        "logistics": "logistics.arcgis.com",
+        "places": "places-api.arcgis.com",
+        "portal": "www.arcgis.com",
+        "routing": "route-api.arcgis.com",
+        "static-map-tiles": "static-map-tiles-api.arcgis.com",
+        "static-maps": "static-maps-api.arcgis.com"
+    },
+    "dev": {
+        "basemaps": "basemapsdev-api.arcgis.com",
+        "basemap-styles": "basemapstylesdev-api.arcgis.com",
+        "elevation": "elevationdev-api.arcgis.com",
+        "enrichment": "geoenrichdev.arcgis.com",
+        "geocode": "geocodedev-api.arcgis.com",
+        "imagery": "ibasemapsdev-api.arcgis.com",
+        "logistics": "logisticsdev.arcgis.com",
+        "places": "placesdev-api.arcgis.com",
+        "portal": "devext.arcgis.com",
+        "routing": "routedev-api.arcgis.com",
+        "static-map-tiles": "static-map-tilesdev-api.arcgis.com",
+        "static-maps": "static-mapsdev-api.arcgis.com"
+    },
+    "qa": {
+        "basemaps": "basemaps-api.arcgis.com",
+        "basemap-styles": "basemapstylesqa-api.arcgis.com",
+        "elevation": "elevationqa-api.arcgis.com",
+        "enrichment": "geoenrichqa.arcgis.com",
+        "geocode": "geocodeqa-api.arcgis.com",
+        "imagery": "ibasemaps-api.arcgis.com",
+        "logistics": "logisticsqa.arcgis.com",
+        "places": "places-api.arcgis.com",
+        "portal": "qaext.arcgis.com",
+        "routing": "route-api.arcgis.com",
+        "static-map-tiles": "static-map-tiles-api.arcgis.com",
+        "static-maps": "static-maps-api.arcgis.com"
+    }
+};
+
+const arcgisServicePaths = {
+    "basemaps": "/arcgis/rest/services/World_Basemap_v2/VectorTileServer/tile/1/1/1",
+    "basemap-styles": "/arcgis/rest/services/styles/v2/styles/arcgis/navigation",
+    "elevation": "/arcgis/rest/services/elevation-service/v1",
+    "enrichment": "",
+    "geocode": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+    "imagery": "",
+    "logistics": "",
+    "places": "",
+    "portal": "",
+    "routing": "",
+    "static-map-tiles": "",
+    "static-maps": ""
+};
+
+/**
+ * Resolve the domain for a given environment and ArcGIS service. For example, if the environment is "prod" and
+ * the service is "basemaps", it will return the corresponding ArcGIS domain for basemaps (e.g., "basemaps-api.arcgis.com").
+ * @param {string} environment Intended environment, one of prod, dev, or qa.
+ * @param {string} service Intended ArcGIS service, must be one of the pre-defined ArcGIS location service types.
+ * @returns {string} The resolved domain for the given environment and service, or "www.arcgis.com" if not found.
+ */
+function resolveDomain(environment, service) {
+    return arcgisDomains[environment]?.[service] ?? "www.arcgis.com";
+}
+
+/**
+ * Resolve the service path for a given environment and ArcGIS service. For example, if the service is "geocode", it
+ * will return the corresponding ArcGIS service path for geocoding
+ * (e.g., "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates").
+ * @param {string} service Intended ArcGIS service, must be one of the pre-defined ArcGIS location service types.
+ * @returns {string} The resolved service path for the given environment and service, or an empty string if not found.
+ */
+function resolveServicePath(service) {
+    return arcgisServicePaths[service] ?? "";
+}
+
+/**
+ * Return a fully qualified URL for the given environment and ArcGIS service.
+ * @param {string} environment Intended environment, one of prod, dev, or qa.
+ * @param {string} service Intended ArcGIS service, must be one of the pre-defined ArcGIS location service types.
+ * @returns {string} The fully qualified URL for the given environment and service.
+ */
+function resolveFullServicePath(environment, service) {
+    const domain = resolveDomain(environment, service);
+    const path = resolveServicePath(service);
+    return `https://${domain}${path}`;
+}
+
+/**
  * Log in a user with the credentials set in the credentials store.
  * @returns {Promise} A Promise that will resolve with an ArcGISIdentityManager object for the logged in user.
  */

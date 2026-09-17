@@ -1,6 +1,7 @@
 secret.js
 apikeys.json
 testing.md
+api-key-attributes-*.yaml
 
 # Logs
 *.csv

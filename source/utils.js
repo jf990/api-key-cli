@@ -8,6 +8,10 @@ import fsExtra from "fs-extra";
 import YAML from "yaml";
 let showVerbose = false;
 
+/**
+ * Enable or disable verbose logging.
+ * @param {boolean} verbose Enable or disable verbose logging.
+ */
 function setVerbose(verbose) {
     showVerbose = verbose;
 }
@@ -74,8 +78,8 @@ function getRelativeExpireDate(daysUntilExpiration) {
  * A basic wait function to pause things briefly so we don't overload the server.
  * @param {integer} milliseconds Time to wait.
  */
-function sleeper (milliseconds) {
-    new Promise(function(resolve) {
+function sleeper(milliseconds) {
+    return new Promise(function(resolve) {
         setTimeout(resolve, milliseconds);
     });
 }
@@ -386,4 +390,4 @@ export {
     appendToken,
     outputResults,
     loadOptions
-}
+};

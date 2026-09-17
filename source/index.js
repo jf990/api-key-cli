@@ -20,17 +20,7 @@ import {
     log,
     getAccessTokenParameter,
     getItemIDParameter,
-    dateFromOptions,
-    localDateFormat,
-    isEmpty,
-    sleeper,
-    isNumeric,
-    saveJSONFile,
-    saveCSVFile,
-    getRelativeExpireDate,
-    normalizeItemType,
     geocodeAddress,
-    appendToken,
     loadOptions
 } from "./utils.js";
 import {
@@ -47,8 +37,6 @@ import {
     checkReferrer
 
 } from "./apiKeyOperations.js";
-
-import fsExtra from "fs-extra";
 import dotenv from "dotenv";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
@@ -172,34 +160,6 @@ async function performRequestAction() {
         break;
     }
 }
-
-function generateRandomList() {
-    const teams = [
-"1 Hackers Without (State) Borders",
-"2 Voters in Ctrl",
-"3 PinPals",
-"4 Plate Shifters",
-"5 Fire Seekers",
-"6 No GIStakes (Just Mappy Accidents)",
-"7 Raster Blaster",
-"8 Koi PONDerers",
-"9 Arcitects",
-"10 Arc-xolotyl",
-"11 Just Keep Rowi(a)n",
-"12 SpareBytes",
-"13 The Chameleons"
-];
-    const teamCount = teams.length;
-    const randomList = [];
-    for (let i = 0; i < teamCount; i++) {
-        const randomTeam = teams[Math.floor(Math.random() * teams.length)];
-        randomList.push(randomTeam);
-        // Remove the selected team from the array to avoid duplicates
-        teams.splice(teams.indexOf(randomTeam), 1);
-    }
-    return randomList;
-}
-
 
 /**
  * Read the command line to pick up any processing options.

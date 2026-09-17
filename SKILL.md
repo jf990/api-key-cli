@@ -1,16 +1,17 @@
 ---
 name: api-key-cli
-description: "Use when working on this repository's ArcGIS API key CLI: implementing or debugging actions, tracing CLI flags, updating YAML-driven key creation, reviewing credential-handling logic, or validating changes with safe non-destructive commands. Do not use for general Node.js questions unrelated to this repo."
+description: "Use when working on this repository's local code: implementing or debugging actions, tracing CLI flags, updating YAML-driven key creation, reviewing credential-handling logic, or validating changes with safe non-destructive commands. Do not use for general Node.js questions unrelated to this repo."
 ---
 
-# API Key CLI Skill
+# API Key CLI Developer Skill
 
 ## Purpose
 
-This repository is a Node.js ESM CLI for inspecting and managing ArcGIS API keys and related developer credential items.
+This repository is the source code fora Node.js ESM CLI for inspecting and managing ArcGIS API keys and related developer credential items.
 
 Use this skill when you need to:
 
+- implement ArcGIS API Key management with ArcGIS REST JS or ArcGIS REST API
 - debug or extend a CLI action in `source/index.js`
 - trace how short flags map into runtime behavior
 - work on API key inspection, reporting, expiration, privilege, referrer, or geocode behavior

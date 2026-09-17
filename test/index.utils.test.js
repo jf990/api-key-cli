@@ -1,17 +1,24 @@
 /**
- * Basic unit tests for helper functions in index.js. These tests focus on the logic of the helper functions and do not involve any external API calls or file system interactions.
+ * Basic unit tests for the utility functions in utils.js. These tests focus on the logic of the helper functions and do not
+ * involve any external API calls or file system interactions.
  */
 import fsExtra from "fs-extra";
 import {
     getAccessTokenParameter,
     getItemIDParameter,
-    isEmpty,
     dateFromOptions,
     localDateFormat,
+    getRelativeExpireDate,
+    isEmpty,
+    sleeper,
     isNumeric,
     normalizeItemType,
+    geocodeAddress,
+    saveJSONFile,
+    saveCSVFile,
     appendToken,
-    outputResults
+    outputResults,
+    loadOptions
 } from "../source/utils.js";
 
 describe("Utility helper functions", function() {
@@ -65,6 +72,14 @@ describe("Utility helper functions", function() {
         expect(isNumeric("12abc")).toBe(false);
     });
 
+    test("sleeper waits for 5 seconds", async function() {
+        const start = Date.now();
+        await sleeper(5000);
+        const elapsed = Date.now() - start;
+        expect(elapsed).toBeGreaterThanOrEqual(4900);
+        expect(elapsed).toBeLessThan(7000);
+    }, 20000);
+
     test("normalizeItemType marks legacy and APIToken items", function() {
         expect(normalizeItemType("API Key", [])).toBe("API Key (legacy)");
         expect(normalizeItemType("Credential", ["APIToken"]))
@@ -83,6 +98,78 @@ describe("Utility helper functions", function() {
         expect(localDateFormat(1784930660613)).toBe("July 24, 2026");
     });
 
+    test("getRelativeExpireDate adds days and sets the time to end of day", function() {
+        const daysAhead = 3;
+        const start = new Date();
+        const expected = new Date(start);
+        expected.setDate(expected.getDate() + daysAhead);
+        expected.setHours(23, 59, 59, 999);
+
+        const result = getRelativeExpireDate(daysAhead);
+
+        expect(result.getFullYear()).toBe(expected.getFullYear());
+        expect(result.getMonth()).toBe(expected.getMonth());
+        expect(result.getDate()).toBe(expected.getDate());
+        expect(result.getHours()).toBe(23);
+        expect(result.getMinutes()).toBe(59);
+        expect(result.getSeconds()).toBe(59);
+        expect(result.getMilliseconds()).toBe(999);
+    });
+
+    test("getRelativeExpireDate supports a date 1 day in the future", function() {
+        const daysAhead = 1;
+        const start = new Date();
+        const expected = new Date(start);
+        expected.setDate(expected.getDate() + daysAhead);
+        expected.setHours(23, 59, 59, 999);
+
+        const result = getRelativeExpireDate(daysAhead);
+
+        expect(result.getFullYear()).toBe(expected.getFullYear());
+        expect(result.getMonth()).toBe(expected.getMonth());
+        expect(result.getDate()).toBe(expected.getDate());
+        expect(result.getHours()).toBe(23);
+        expect(result.getMinutes()).toBe(59);
+        expect(result.getSeconds()).toBe(59);
+        expect(result.getMilliseconds()).toBe(999);
+    });
+
+    test("getRelativeExpireDate supports a date 1 day in the past", function() {
+        const daysAgo = -1;
+        const start = new Date();
+        const expected = new Date(start);
+        expected.setDate(expected.getDate() + daysAgo);
+        expected.setHours(23, 59, 59, 999);
+
+        const result = getRelativeExpireDate(daysAgo);
+
+        expect(result.getFullYear()).toBe(expected.getFullYear());
+        expect(result.getMonth()).toBe(expected.getMonth());
+        expect(result.getDate()).toBe(expected.getDate());
+        expect(result.getHours()).toBe(23);
+        expect(result.getMinutes()).toBe(59);
+        expect(result.getSeconds()).toBe(59);
+        expect(result.getMilliseconds()).toBe(999);
+    });
+
+    test("getRelativeExpireDate supports a date roughly six months in the future", function() {
+        const daysAhead = 183;
+        const start = new Date();
+        const expected = new Date(start);
+        expected.setDate(expected.getDate() + daysAhead);
+        expected.setHours(23, 59, 59, 999);
+
+        const result = getRelativeExpireDate(daysAhead);
+
+        expect(result.getFullYear()).toBe(expected.getFullYear());
+        expect(result.getMonth()).toBe(expected.getMonth());
+        expect(result.getDate()).toBe(expected.getDate());
+        expect(result.getHours()).toBe(23);
+        expect(result.getMinutes()).toBe(59);
+        expect(result.getSeconds()).toBe(59);
+        expect(result.getMilliseconds()).toBe(999);
+    });
+
     test("dateFromOptions with explicit date returns that day timestamp", function() {
         const timestamp = dateFromOptions("2026-12-31", 7);
         const parsed = new Date(timestamp);
@@ -95,6 +182,64 @@ describe("Utility helper functions", function() {
         const now = Date.now();
         const timestamp = dateFromOptions("", 2);
         expect(timestamp).toBeGreaterThan(now);
+    });
+
+    test("saveJSONFile writes JSON object to disk and reads back exactly", async function() {
+        const results = { message: "Test output", count: 3, nested: { ok: true } };
+        const outputFile = "test_savejsonfile.json";
+
+        await saveJSONFile(results, outputFile);
+        const data = fsExtra.readFileSync(outputFile, "utf8");
+
+        expect(data).toBe(JSON.stringify(results, null, 2));
+        expect(JSON.parse(data)).toEqual(results);
+
+        fsExtra.unlinkSync(outputFile); // Clean up after test
+    });
+
+    test("loadOptions reads YAML and sets each expected key to a valid value", function() {
+        const yamlFile = "test_loadoptions.yaml";
+        const yamlData = `options:
+  title: "Demo API key"
+  description: "Test key for loadOptions"
+  tags: ["demo", "test"]
+  privileges: ["premium:user:basemaps"]
+  referrers: ["https://localhost:8000"]
+  redirect_uris: ["https://example.com/callback"]
+  generateToken1: true
+  apiToken1ExpirationDate: "2026-10-31"
+  apiToken1ExpirationDays: 3
+  generateToken2: false
+  apiToken2ExpirationDate: "2026-11-30"
+  apiToken2ExpirationDays: 2
+`;
+        fsExtra.writeFileSync(yamlFile, yamlData, "utf8");
+
+        const options = loadOptions(yamlFile);
+
+        expect(options).not.toBeNull();
+        expect(typeof options.title).toBe("string");
+        expect(options.title.length).toBeGreaterThan(0);
+        expect(typeof options.description).toBe("string");
+        expect(options.description.length).toBeGreaterThan(0);
+        expect(Array.isArray(options.tags)).toBe(true);
+        expect(options.tags.length).toBeGreaterThan(0);
+        expect(Array.isArray(options.privileges)).toBe(true);
+        expect(options.privileges.length).toBeGreaterThan(0);
+        expect(Array.isArray(options.httpReferrers)).toBe(true);
+        expect(options.httpReferrers.length).toBeGreaterThan(0);
+        expect(Array.isArray(options.redirect_uris)).toBe(true);
+        expect(options.redirect_uris.length).toBeGreaterThan(0);
+        expect(typeof options.generateToken1).toBe("boolean");
+        expect(options.generateToken1).toBe(true);
+        expect(typeof options.apiToken1ExpirationDate).toBe("number");
+        expect(options.apiToken1ExpirationDate).toBeGreaterThan(0);
+        expect(typeof options.generateToken2).toBe("boolean");
+        expect(options.generateToken2).toBe(false);
+        expect(typeof options.apiToken2ExpirationDate).toBe("number");
+        expect(options.apiToken2ExpirationDate).toBeGreaterThan(0);
+
+        fsExtra.unlinkSync(yamlFile); // Clean up after test
     });
 
     test("outputResults creates expected JSON file with contents", async function() {
@@ -132,6 +277,22 @@ describe("Utility helper functions", function() {
         fsExtra.unlinkSync(outputFile); // Clean up after test
     });
 
+
+    test("saveCSVFile writes an array of objects to disk and reads back exactly", async function() {
+        const results = [
+            { name: "alpha", count: 3, active: "true" },
+            { name: "beta", count: 7, active: "false" }
+        ];
+        const outputFile = "test_savecsvfile.csv";
+        const expected = 'name,count,active\n"alpha",3,"true"\n"beta",7,"false"';
+
+        await saveCSVFile(results, outputFile);
+        const data = fsExtra.readFileSync(outputFile, "utf8");
+
+        expect(data).toBe(expected);
+
+        fsExtra.unlinkSync(outputFile); // Clean up after test
+    });
 
     test("outputResults creates expected CSV file with contents", async function() {
         let results = { message: "Test output" };
@@ -193,4 +354,6 @@ describe("Utility helper functions", function() {
         result = appendToken(url, token);
         expect(result).toBe("https://route-api.arcgis.com/arcgis/rest/services/World/OriginDestinationCostMatrix/NAServer/OriginDestinationCostMatrix_World/solveODCostMatrix?token=aapt1234123412341234.1234567890abcdef1234567890abcdef&f=json&route=%5B1%2C2%2C3%5D");
     });
+
+
 });
