@@ -434,8 +434,7 @@ async function inspectAPIKeyToken(token, referrer = "", outFile = "stdout", form
             }
             const jsonResponse = await response.json();
             if (jsonResponse.error) {
-                // { error: { code: 498, message: 'Invalid token.', details: [] } }
-                log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+                log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message} ${JSON.stringify(jsonResponse.error.details)}`, "error");
                 return process.exit(90);
             } else {
                 const reducedResponse = {
@@ -738,8 +737,7 @@ async function checkPrivileges(args, environment = "prod") {
         }
         const jsonResponse = await response.json();
         if (jsonResponse.error) {
-            // { error: { code: 498, message: 'Invalid token.', details: [] } }
-            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message} ${JSON.stringify(jsonResponse.error.details)}`, "error");
             return process.exit(90);
         } else {
             const actualPrivileges = jsonResponse.appInfo.privileges;
