@@ -2,6 +2,7 @@
  * Basic unit tests for the utility functions in utils.js. These tests focus on the logic of the helper functions and do not
  * involve any external API calls or file system interactions.
  */
+import process from "node:process";
 import fsExtra from "fs-extra";
 import {
     getAccessTokenParameter,
@@ -13,13 +14,14 @@ import {
     sleeper,
     isNumeric,
     normalizeItemType,
-    geocodeAddress,
     saveJSONFile,
     saveCSVFile,
     appendToken,
     outputResults,
-    loadOptions
+    loadOptions,
+    validateEnvironment
 } from "../source/utils.js";
+import { describe, afterEach, expect, test } from '@jest/globals';
 
 describe("Utility helper functions", function() {
     afterEach(function() {
@@ -355,5 +357,19 @@ describe("Utility helper functions", function() {
         expect(result).toBe("https://route-api.arcgis.com/arcgis/rest/services/World/OriginDestinationCostMatrix/NAServer/OriginDestinationCostMatrix_World/solveODCostMatrix?token=aapt1234123412341234.1234567890abcdef1234567890abcdef&f=json&route=%5B1%2C2%2C3%5D");
     });
 
-
+    test("validateEnvironment correctly normalizes environment strings", function() {
+        expect(validateEnvironment("dev")).toBe("dev");
+        expect(validateEnvironment("development")).toBe("dev");
+        expect(validateEnvironment("prod")).toBe("prod");
+        expect(validateEnvironment("production")).toBe("prod");
+        expect(validateEnvironment("qa")).toBe("qa");
+        expect(validateEnvironment("stg")).toBe("qa");
+        expect(validateEnvironment("staging")).toBe("qa");
+        expect(validateEnvironment("")).toBe("prod");
+        expect(validateEnvironment("unknown")).toBe("prod");
+        expect(validateEnvironment()).toBe("prod");
+        expect(validateEnvironment(null)).toBe("prod");
+        expect(validateEnvironment(0)).toBe("prod");
+        expect(validateEnvironment("x")).toBe("prod");
+    });
 });

@@ -2,7 +2,7 @@
 
 ## Project Scope
 
-This repository is a Node.js ESM CLI for inspecting and managing ArcGIS API keys and related developer credential items.
+This repository is a Node.js ESM and CLI for inspecting and managing ArcGIS API keys and related developer credential items.
 
 Read these first before making changes:
 

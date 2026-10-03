@@ -2,6 +2,7 @@
  * Utility functions for the API key CLI tool.
  * @module utils
  */
+import process from "node:process";
 import chalk from "chalk";
 import path from "path";
 import fsExtra from "fs-extra";
@@ -93,9 +94,9 @@ function sleeper(milliseconds) {
 function isEmpty(value) {
     return (
     value == null || value == "" // null or undefined or coerced to an empty string
-      || (typeof value === 'string' && value.trim().length === 0) // empty string
+      || (typeof value === "string" && value.trim().length === 0) // empty string
       || (Array.isArray(value) && value.length === 0) // empty array
-      || (typeof value === 'object' && Object.keys(value).length === 0) // empty object
+      || (typeof value === "object" && Object.keys(value).length === 0) // empty object
     );
 }
 
@@ -111,7 +112,7 @@ function dateFromOptions(fullDate, numberOfDays) {
     let expirationDate;
     if (fullDate) {
         expirationDate = new Date(fullDate);
-        if (expirationDate.valueOf() === NaN) {
+        if (isNaN(expirationDate.valueOf())) {
             expirationDate = getRelativeExpireDate(numberOfDays ?? 3);
         }
     } else {
@@ -130,7 +131,7 @@ function localDateFormat(timestamp) {
         return "0";
     }
     const date = new Date(timestamp);
-    return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
+    return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", day: "numeric" }).format(date);
 }
 
 /**
@@ -356,7 +357,7 @@ function loadOptions(filePath) {
             apiKeyOptions.description = localOptions.description ?? "No description provided.";
             apiKeyOptions.tags = localOptions.tags ?? [];
             apiKeyOptions.privileges = localOptions.privileges ?? [];
-            apiKeyOptions.httpReferrers = localOptions.referrers ?? [];
+            apiKeyOptions.httpReferrers = localOptions.referrers ?? localOptions.httpReferrers ?? [];
             apiKeyOptions.redirect_uris = localOptions.redirect_uris ?? [];
             apiKeyOptions.generateToken1 = localOptions.generateToken1 ?? true;
             apiKeyOptions.apiToken1ExpirationDate = dateFromOptions(localOptions.apiToken1ExpirationDate ?? "", localOptions.apiToken1ExpirationDays ?? 0);
@@ -370,6 +371,28 @@ function loadOptions(filePath) {
         log(`Error parsing options file YAML: ${exception.message}`, "error");
     }
     return null;
+}
+
+/**
+ * Validates the proposed environment and returns a normalized environment string. Typically
+ * this is one of "dev", "qa", or "prod". Anything not recognized returns "prod".
+ * @param {string} proposedEnvironment The environment the user is looking to connect with.
+ * @returns {string} One of prod|dev|qa.
+ */
+function validateEnvironment(proposedEnvironment) {
+    const validEnvironments = ["dev", "devext", "development", "stg", "staging", "qa", "qaext", "prod", "production", ""];
+    if (proposedEnvironment === undefined || proposedEnvironment === null) {
+        proposedEnvironment = process.env.ARCGIS_ENVIRONMENT ?? "prod";
+    }
+    proposedEnvironment = proposedEnvironment?.toString()?.toLowerCase();
+    const index = validEnvironments.indexOf(proposedEnvironment);
+    if (index >= 0 && index < 3) {
+        return "dev";
+    } else if (index >= 3 && index < 7) {
+        return "qa";
+    } else {
+        return "prod";
+    }
 }
 
 export {
@@ -389,5 +412,6 @@ export {
     saveCSVFile,
     appendToken,
     outputResults,
-    loadOptions
+    loadOptions,
+    validateEnvironment
 };

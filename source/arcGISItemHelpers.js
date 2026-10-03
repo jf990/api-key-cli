@@ -1,11 +1,11 @@
 /**
  * Utility functions to work with content items in an ArcGIS Organization.
  */
+import process from "node:process";
 import { searchItems, SearchQueryBuilder, createItem, updateItem, getItem, removeItem, getSelf } from "@esri/arcgis-rest-portal";
 import { request, ArcGISIdentityManager } from "@esri/arcgis-rest-request";
 import { log } from "./utils.js";
 
-const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&token=";
 const ArcGISPrivileges = {
     basemaps:               "premium:user:basemaps",
     basemapsStatic:         "premium:user:staticbasemaptiles",
@@ -33,28 +33,77 @@ const ArcGISPrivileges = {
     item:                   "portal:app:access:item:"
 };
 
+/**
+ * Given a privilege string, determine which endpoint path we can use to access the corresponding ArcGIS service.
+ */
 const privilegeToEndpointMap = {
-    "premium:user:basemaps": "https://basemapstyles-api.arcgis.com/arcgis/rest/services/styles/v2/styles/arcgis/navigation",
-    "premium:user:staticbasemaptiles": "https://static-map-tiles-api.arcgis.com/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/navigation/static/tile/1/1/1",
-    "premium:user:staticMaps": "https://static-maps-api.arcgis.com/arcgis/rest/services/static-maps-service/beta-rc/static-maps/arcgis/navigation/with-point",
-    "premium:user:geocode": "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json",
-    "premium:user:geocode:stored": "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json",
-    "premium:user:geocode:temporary": "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json",
-    "premium:user:elevation": "https://elevation-api.arcgis.com/arcgis/rest/services/elevation-service/v1",
-    "premium:user:geoenrichment": "https://geoenrich.arcgis.com/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
-    "premium:user:demographics": "https://geoenrich.arcgis.com/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
-    "premium:user:featurereport": "https://geoenrich.arcgis.com/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
-    "premium:user:places": "https://places-api.arcgis.com/arcgis/rest/services/places-service/v1/places/near-point",
-    "premium:user:networkanalysis:routing": "https://route-api.arcgis.com/arcgis/rest/services/World",
-    "premium:user:networkanalysis:optimizedrouting": "https://route-api.arcgis.com/arcgis/rest/services/World",
-    "premium:user:networkanalysis:servicearea": "https://route-api.arcgis.com/arcgis/rest/services/World/ServiceAreas/NAServer/ServiceArea_World/solveServiceArea",
-    "premium:user:networkanalysis:origindestinationcostmatrix": "https://route-api.arcgis.com/arcgis/rest/services/World/OriginDestinationCostMatrix/NAServer/OriginDestinationCostMatrix_World/solveODCostMatrix",
-    "premium:user:networkanalysis:locationallocation": "https://logistics.arcgis.com/arcgis/rest/services/World/LocationAllocation/GPServer/SolveLocationAllocation/submitJob",
-    "premium:user:networkanalysis:vehiclerouting": "https://logistics.arcgis.com/arcgis/rest/services/World/VehicleRoutingProblemSync/GPServer/EditVehicleRoutingProblem/execute",
-    "premium:user:networkanalysis:closestfacility": "https://route-api.arcgis.com/arcgis/rest/services/World/ClosestFacility/NAServer/ClosestFacility_World/solveClosestFacility",
-    "premium:user:networkanalysis:snaptoroads": "https://route-api.arcgis.com/arcgis/rest/services/World/SnapToRoadsSync/GPServer/SnapToRoads/execute",
-    "premium:user:networkanalysis:lastmiledelivery": "https://logistics.arcgis.com/arcgis/rest/services/World/VehicleRoutingProblem/GPServer/SolveLastMileDelivery/submitJob",
-    "premium:user:spatialanalysis": "https://${analysis_url}/AggregatePoints/submitJob"
+    "premium:user:basemaps": "/arcgis/rest/services/styles/v2/styles/arcgis/navigation",
+    "premium:user:staticbasemaptiles": "/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/navigation/static/tile/1/1/1",
+    "premium:user:staticMaps": "/arcgis/rest/services/static-maps-service/beta-rc/static-maps/arcgis/navigation/with-point",
+    "premium:user:geocode": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+    "premium:user:geocode:stored": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+    "premium:user:geocode:temporary": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+    "premium:user:elevation": "/arcgis/rest/services/elevation-service/v1",
+    "premium:user:geoenrichment": "/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
+    "premium:user:demographics": "/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
+    "premium:user:featurereport": "/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
+    "premium:user:places": "/arcgis/rest/services/places-service/v1/places/near-point",
+    "premium:user:networkanalysis:routing": "/arcgis/rest/services/World",
+    "premium:user:networkanalysis:optimizedrouting": "/arcgis/rest/services/World",
+    "premium:user:networkanalysis:servicearea": "/arcgis/rest/services/World/ServiceAreas/NAServer/ServiceArea_World/solveServiceArea",
+    "premium:user:networkanalysis:origindestinationcostmatrix": "/arcgis/rest/services/World/OriginDestinationCostMatrix/NAServer/OriginDestinationCostMatrix_World/solveODCostMatrix",
+    "premium:user:networkanalysis:locationallocation": "/arcgis/rest/services/World/LocationAllocation/GPServer/SolveLocationAllocation/submitJob",
+    "premium:user:networkanalysis:vehiclerouting": "/arcgis/rest/services/World/VehicleRoutingProblemSync/GPServer/EditVehicleRoutingProblem/execute",
+    "premium:user:networkanalysis:closestfacility": "/arcgis/rest/services/World/ClosestFacility/NAServer/ClosestFacility_World/solveClosestFacility",
+    "premium:user:networkanalysis:snaptoroads": "/arcgis/rest/services/World/SnapToRoadsSync/GPServer/SnapToRoads/execute",
+    "premium:user:networkanalysis:lastmiledelivery": "/arcgis/rest/services/World/VehicleRoutingProblem/GPServer/SolveLastMileDelivery/submitJob",
+    "premium:user:spatialanalysis": "/AggregatePoints/submitJob"
+};
+
+/**
+ * A set of arbitrary service endpoints that we can use when given a valid token with matching privilege will return a 200 response.
+ */
+const arcgisServicePaths = {
+    "basemaps": "/arcgis/rest/services/World_Basemap_v2/VectorTileServer/tile/10/507/807",
+    "basemap-styles": "/arcgis/rest/services/styles/v2/styles/arcgis/navigation",
+    "elevation": "/arcgis/rest/services/elevation-service/v1",
+    "enrichment": "/arcgis/rest/services/World/geoenrichmentserver/Geoenrichment/Enrich",
+    "geocode": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
+    "imagery": "/arcgis/rest/services/World_Imagery/MapServer/tile/10/507/807",
+    "logistics": "/arcgis/rest/services/World/ClosestFacility/NAServer/ClosestFacility_World/solveClosestFacility",
+    "places": "/arcgis/rest/services/places-service/v1/places/near-point",
+    "portal": "/sharing/rest/portals/self",
+    "routing": "/arcgis/rest/services/World",
+    "static-map-tiles": "/arcgis/rest/services/static-basemap-tiles-service/v1/arcgis/navigation/static/tile/10/507/807",
+    "static-maps": "/arcgis/rest/services/static-maps-service/beta-rc/static-maps/arcgis/navigation/with-point",
+    "spatialanalysis": "/AggregatePoints/submitJob"
+};
+
+/**
+ * Given a privilege string, determine which ArcGIS service consumes that privilege.
+ */
+const privilegeToServiceMap = {
+    "premium:user:basemaps": "basemap-styles",
+    "premium:user:staticbasemaptiles": "static-map-tiles",
+    "premium:user:staticMaps": "static-maps",
+    "premium:user:geocode": "geocode",
+    "premium:user:geocode:stored": "geocode",
+    "premium:user:geocode:temporary": "geocode",
+    "premium:user:elevation": "elevation",
+    "premium:user:geoenrichment": "enrichment",
+    "premium:user:demographics": "enrichment",
+    "premium:user:featurereport": "enrichment",
+    "premium:user:places": "places",
+    "premium:user:networkanalysis:routing": "routing",
+    "premium:user:networkanalysis:optimizedrouting": "routing",
+    "premium:user:networkanalysis:servicearea": "routing",
+    "premium:user:networkanalysis:origindestinationcostmatrix": "routing",
+    "premium:user:networkanalysis:locationallocation": "logistics",
+    "premium:user:networkanalysis:vehiclerouting": "logistics",
+    "premium:user:networkanalysis:closestfacility": "routing",
+    "premium:user:networkanalysis:snaptoroads": "routing",
+    "premium:user:networkanalysis:lastmiledelivery": "logistics",
+    "premium:user:spatialanalysis": "spatialanalysis"
 };
 
 /**
@@ -73,7 +122,8 @@ const arcgisDomains = {
         "portal": "www.arcgis.com",
         "routing": "route-api.arcgis.com",
         "static-map-tiles": "static-map-tiles-api.arcgis.com",
-        "static-maps": "static-maps-api.arcgis.com"
+        "static-maps": "static-maps-api.arcgis.com",
+        "spatialanalysis": "" // requires an additional query
     },
     "dev": {
         "basemaps": "basemapsdev-api.arcgis.com",
@@ -87,7 +137,8 @@ const arcgisDomains = {
         "portal": "devext.arcgis.com",
         "routing": "routedev-api.arcgis.com",
         "static-map-tiles": "static-map-tilesdev-api.arcgis.com",
-        "static-maps": "static-mapsdev-api.arcgis.com"
+        "static-maps": "static-mapsdev-api.arcgis.com",
+        "spatialanalysis": "" // requires an additional query
     },
     "qa": {
         "basemaps": "basemaps-api.arcgis.com",
@@ -101,33 +152,32 @@ const arcgisDomains = {
         "portal": "qaext.arcgis.com",
         "routing": "route-api.arcgis.com",
         "static-map-tiles": "static-map-tiles-api.arcgis.com",
-        "static-maps": "static-maps-api.arcgis.com"
+        "static-maps": "static-maps-api.arcgis.com",
+        "spatialanalysis": "" // requires an additional query
     }
 };
 
-const arcgisServicePaths = {
-    "basemaps": "/arcgis/rest/services/World_Basemap_v2/VectorTileServer/tile/1/1/1",
-    "basemap-styles": "/arcgis/rest/services/styles/v2/styles/arcgis/navigation",
-    "elevation": "/arcgis/rest/services/elevation-service/v1",
-    "enrichment": "",
-    "geocode": "/arcgis/rest/services/World/GeocodeServer/findAddressCandidates",
-    "imagery": "",
-    "logistics": "",
-    "places": "",
-    "portal": "",
-    "routing": "",
-    "static-map-tiles": "",
-    "static-maps": ""
-};
+/**
+ * Get the URL for the portal self endpoint, optionally including a token. This is used to
+ * return the portal information about the token or to authenticate the user.
+ * @param {string} environment Which environment to use, default is prod.
+ * @param {string} token Optional token to append to query string.
+ * @returns {string} A fully qualified URL.
+ */
+function getPortalSelfURL(environment = "prod", token = "") {
+    const domain = resolveDomain("portal", environment);
+    const addToken = token ? `&token=${encodeURIComponent(token)}` : "";
+    return `https://${domain}/sharing/rest/portals/self?f=json${addToken}`;
+}
 
 /**
  * Resolve the domain for a given environment and ArcGIS service. For example, if the environment is "prod" and
  * the service is "basemaps", it will return the corresponding ArcGIS domain for basemaps (e.g., "basemaps-api.arcgis.com").
- * @param {string} environment Intended environment, one of prod, dev, or qa.
  * @param {string} service Intended ArcGIS service, must be one of the pre-defined ArcGIS location service types.
+ * @param {string} environment Intended environment, one of prod, dev, or qa. Default is prod.
  * @returns {string} The resolved domain for the given environment and service, or "www.arcgis.com" if not found.
  */
-function resolveDomain(environment, service) {
+function resolveDomain(service, environment = "prod") {
     return arcgisDomains[environment]?.[service] ?? "www.arcgis.com";
 }
 
@@ -144,35 +194,90 @@ function resolveServicePath(service) {
 
 /**
  * Return a fully qualified URL for the given environment and ArcGIS service.
- * @param {string} environment Intended environment, one of prod, dev, or qa.
  * @param {string} service Intended ArcGIS service, must be one of the pre-defined ArcGIS location service types.
+ * @param {string} environment Intended environment, one of prod, dev, or qa. Default is prod.
  * @returns {string} The fully qualified URL for the given environment and service.
  */
-function resolveFullServicePath(environment, service) {
-    const domain = resolveDomain(environment, service);
+function resolveFullServicePath(service, environment = "prod") {
+    const domain = resolveDomain(service, environment);
     const path = resolveServicePath(service);
     return `https://${domain}${path}`;
 }
 
 /**
- * Log in a user with the credentials set in the credentials store.
- * @returns {Promise} A Promise that will resolve with an ArcGISIdentityManager object for the logged in user.
+ * Given an ArcGIS privilege string, return the corresponding service it maps to according to the privilegeToServiceMap. If given
+ * an array of privileges, return the first match.
+ * @param {string|Array} privilege The ArcGIS privilege or an array of privileges to map to a service.
+ * @returns {string|null} The corresponding service for the given privilege, or null if no match is found.
  */
-function signInWithArcGIS() {
-    if (process.env.ARCGIS_USER_NAME && process.env.ARCGIS_USER_PASSWORD) {
-        return ArcGISIdentityManager.signIn({
-            username: process.env.ARCGIS_USER_NAME,
-            password: process.env.ARCGIS_USER_PASSWORD
-        })
-        .then(function(identityManager) {
-            return identityManager;
-        })
-        .catch(function(exception) {
-            throw exception;
-        });
-    } else {
-        throw new Error("Missing credentials. Update .env with your ArcGIS credentials.");
+function privilegeToService(privilege) {
+    if ( ! privilege || (typeof privilege !== "string" && ! Array.isArray(privilege))) {
+        throw new Error("A single ArcGIS privilege string or an array of privileges is required to get the service domain.");
     }
+    if (Array.isArray(privilege)) {
+        for (const priv of privilege) {
+            if (privilegeToServiceMap[priv]) {
+                return privilegeToServiceMap[priv];
+            }
+        }
+        return null;
+    }
+    return privilegeToServiceMap[privilege] || null;
+}
+
+/**
+ * Given a single ArcGIS privilege string, return the URL of the service endpoint that matches the privilege. If given
+ * an array of privileges we return the URL of the first matching service endpoint.
+ * @param {string|array} privilege A single ArcGIS privilege string (e.g. premium:user:basemaps) or an array of privileges.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod"). Default is "prod".
+ * @returns {string|null} The URL of the service endpoint matching the privilege, or null if the lookup fails.
+ */
+function getLocationServiceEndpointFromPrivilege(privilege, environment = "prod") {
+    if ( ! privilege || (typeof privilege !== "string" && ! Array.isArray(privilege))) {
+        throw new Error("A single ArcGIS privilege string or an array of privileges is required to get the service endpoint.");
+    }
+    if (Array.isArray(privilege)) {
+        for (const priv of privilege) {
+            const endPoint = privilegeToEndpointMap[priv];
+            if (endPoint) {
+                const service = privilegeToService(priv);
+                return `https://${resolveDomain(service, environment)}${endPoint}`;
+            }
+        }
+        return null;
+    }
+    const service = privilegeToService(privilege);
+    const endPoint = privilegeToEndpointMap[privilege] ?? "";
+    return `https://${resolveDomain(service, environment)}${endPoint}`;
+}
+
+/**
+ * Log in a user with the credentials set in the credentials store.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
+ * @returns {Promise} A Promise that will resolve with an ArcGISIdentityManager object for the logged in user, and reject if
+ * the sign-in fails or credentials are missing.
+ */
+function signInWithArcGIS(environment) {
+    return new Promise(function(resolve, reject) {
+        if (process.env.ARCGIS_USER_NAME && process.env.ARCGIS_USER_PASSWORD) {
+            const signInOptions = {
+                username: process.env.ARCGIS_USER_NAME,
+                password: process.env.ARCGIS_USER_PASSWORD
+            };
+            if (environment != "prod") {
+                signInOptions.portal = "https://" + resolveDomain("portal", environment) + "/sharing/rest";
+            }
+            ArcGISIdentityManager.signIn(signInOptions)
+            .then(function(identityManager) {
+                resolve(identityManager);
+            })
+            .catch(function(exception) {
+                reject(new Error(`Failed to sign in to ArcGIS stage ${environment} with username ${process.env.ARCGIS_USER_NAME}: ${exception.message}`));
+            });
+        } else {
+            reject(new Error("Missing credentials. Update .env with your ArcGIS credentials."));
+        }
+    });
 }
 
 /**
@@ -291,34 +396,25 @@ async function getAuthenticationItems(authentication) {
             });    
         });
     }
-    return new Promise(async function(resolve, reject) {
-        let nextPage = 0;
-        let allItems = [];
+    let nextPage = 0;
+    let allItems = [];
 
-        // Query for items until we get less than a full page of items.
-        while (true) {
-            nextPage += 1;
-            try {
-                let items = await getPageOfAuthenticationItems(nextPage);
-                allItems = allItems.concat(items);
-                if (items.length < pageSize || nextPage > 100) { // if we got less than a full page, or we've paged through 100 pages (1000 items, which is likely more items than any user has), then stop paging and return what we have.
-                    resolve(allItems);
-                    return;
-                }
-            } catch (exception) {
-                reject(exception);
-                return;
-            }
+    // Query for items until we get less than a full page of items.
+    while (true) {
+        nextPage += 1;
+        const items = await getPageOfAuthenticationItems(nextPage);
+        allItems = allItems.concat(items);
+        if (items.length < pageSize || nextPage > 100) { // if we got less than a full page, or we've paged through 100 pages (1000 items, which is likely more items than any user has), then stop paging and return what we have.
+            return allItems;
         }
-        resolve(allItems);
-    });
+    }
 }
 
 /**
  * Get a list of the logged in user's API keys as an array of items. This is
  * done using the portal search API https://developers.arcgis.com/rest/users-groups-and-items/search.htm.
  * @param {ArcGISIdentityManager} authentication Identity of the logged in user.
- * @returns {Promise} Resolves with the array of items.
+ * @returns {Array} Returns an array of the users API key items.
  */
 async function getAPIKeyItems(authentication) {
     const pageSize = 10;
@@ -358,27 +454,18 @@ async function getAPIKeyItems(authentication) {
             });    
         });
     }
-    return new Promise(async function(resolve, reject) {
-        let nextPage = 0;
-        let allItems = [];
+    let nextPage = 0;
+    let allItems = [];
 
-        // Query for items until we get less than a full page of items.
-        while (true) {
-            nextPage += 1;
-            try {
-                let items = await getPageOfAPIKeyItems(nextPage);
-                allItems = allItems.concat(items);
-                if (items.length < pageSize || nextPage > 100) { // if we got less than a full page, or we've paged through 100 pages (1000 items, which is likely more items than any user has), then stop paging and return what we have.
-                    resolve(allItems);
-                    return;
-                }
-            } catch (exception) {
-                reject(exception);
-                return;
-            }
+    // Query for items until we get less than a full page of items.
+    while (true) {
+        nextPage += 1;
+        let items = await getPageOfAPIKeyItems(nextPage);
+        allItems = allItems.concat(items);
+        if (items.length < pageSize || nextPage > 100) { // if we got less than a full page, or we've paged through 100 pages (1000 items, which is likely more items than any user has), then stop paging and return what we have.
+            return allItems;
         }
-        resolve(allItems);
-    });
+    }
 }
 
 /**
@@ -387,32 +474,28 @@ async function getAPIKeyItems(authentication) {
  * @param {ArcGISIdentityManager} authentication The authentication object of the logged in user.
  * @returns {Promise} Resolves with the array of items.
  */
-function getUserAuthenticationItems(authentication) {
-    return new Promise(function(resolve, reject) {
-        getAuthenticationItems(authentication)
-        .then(function(items) {
-            let filteredItems = [];
-            items.forEach(function(item) {
-                filteredItems.push({
-                    id: item.id,
-                    title: item.title,
-                    description: item.description,
-                    snippet: item.snippet,
-                    type: item.type,
-                    typeKeywords: item.typeKeywords,
-                    created: item.created,
-                    modified: item.modified,
-                    tags: item.tags,
-                    apiToken1ExpirationDate: item.apiToken1ExpirationDate,
-                    apiToken2ExpirationDate: item.apiToken2ExpirationDate
-                });
+async function getUserAuthenticationItems(authentication) {
+    const items = await getAuthenticationItems(authentication);
+    if (items) {
+        let filteredItems = [];
+        items.forEach(function(item) {
+            filteredItems.push({
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                snippet: item.snippet,
+                type: item.type,
+                typeKeywords: item.typeKeywords,
+                created: item.created,
+                modified: item.modified,
+                tags: item.tags,
+                apiToken1ExpirationDate: item.apiToken1ExpirationDate,
+                apiToken2ExpirationDate: item.apiToken2ExpirationDate
             });
-            resolve(filteredItems);
-        })
-        .catch(function(exception) {
-            reject(exception);
         });
-    });
+        return filteredItems;
+    }
+    return [];
 }
 
 /**
@@ -551,37 +634,23 @@ async function getSubscriptionPrivileges(authentication) {
     return userInfo.user.privileges;
 }
 
-/**
- * Given a single ArcGIS privilege string, return the URL of the service endpoint that matches the privilege.
- * @param {string|array} privilege A single ArcGIS privilege string (e.g. premium:user:basemaps) or an array of privileges.
- * @returns {string|null} The URL of the service endpoint matching the privilege, or null if the lookup fails.
- */
-function getLocationServiceEndpointFromPrivilege(privilege) {
-    if (!privilege || (typeof privilege !== "string" && !Array.isArray(privilege))) {
-        throw new Error("A single ArcGIS privilege string or an array of privileges is required to get the service endpoint.");
-    }
-    if (Array.isArray(privilege)) {
-        for (const priv of privilege) {
-            if (privilegeToEndpointMap[priv]) {
-                return privilegeToEndpointMap[priv];
-            }
-        }
-        return null;
-    }
-    return privilegeToEndpointMap[privilege] || null;
-}
-
 export {
+    resolveDomain,
+    resolveServicePath,
+    resolveFullServicePath,
     signInWithArcGIS,
     ArcGISPrivileges,
     getAuthenticationItems,
     getUserAuthenticationItems,
-    getAPIKeyItems,
+    verifyAPIKeyOptions,
     getUserAPIKeyItems,
     createPortalItem,
     updatePortalItem,
     getPortalItem,
     deletePortalItem,
     getSubscriptionPrivileges,
-    getLocationServiceEndpointFromPrivilege
+    privilegeToService,
+    getLocationServiceEndpointFromPrivilege,
+    registerAPIKeyApp,
+    getPortalSelfURL
 };
