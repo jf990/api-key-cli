@@ -13,32 +13,8 @@ Read these first before making changes:
 ## Working Commands
 
 - Install dependencies: `npm install`
-- Run the CLI: `npm start`
+- Run the CLI: `npm start` or `npx api-key-cli`
 - Pass action flags through npm: `npm start -- -a inspect -i <itemId>`
-- Direct entrypoint: `node ./source/index.js ...`
-
-The test suite is run with `npm test`. It will test and validate the helper functions found in ./source/utils.js.
-
-## Code Map
-
-- [source/index.js](source/index.js) is the main CLI entrypoint and action dispatcher.
-- [source/arcGISItemHelpers.js](source/arcGISItemHelpers.js) wraps ArcGIS portal item operations and developer credential item lookup.
-- [source/usageReport.js](source/usageReport.js) handles usage-report creation and CSV download.
-- [source/utils.js](source/utils.js) are helper functions that support the core API.
-
-## Repo Conventions
-
-- Keep the code ESM-compatible. The project uses `"type": "module"`.
-- Preserve the current CLI contract: short flags such as `-a`, `-i`, `-t`, `-k`, `-p`, `-r`, `-u` are used directly from `yargs(...).parse()`.
-- Prefer small, local edits in the existing style. The code mixes `async` functions with `.then(...).catch(...)`; do not refactor broadly unless the task requires it.
-- Use the existing `log(...)` helper in [source/index.js](source/index.js) for user-facing console output instead of adding ad hoc `console.log` calls.
-- Environment variables can intentionally override CLI arguments, especially `ARCGIS_TOKEN` and `ARCGIS_ITEM_ID`.
-
-## Validation Guidance
-
-- Validate changes with a targeted CLI invocation when possible, not `npm test`.
-- Prefer actions that do not mutate remote data unless the task specifically requires mutation.
-- If a change touches credential handling, avoid printing secrets or copying values from local `.env` or `account-*.env` files.
 
 ## Known Pitfalls
 
