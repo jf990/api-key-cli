@@ -2,6 +2,14 @@
 
 This file tracks changes made by each version release.
 
+## v1.2.2
+
+- Added the ability to test on Esri's dev and qa tiers (if the developer has access to them). Use the `ARCGIS_ENVIRONMENT` environment variable or the `-s` CLI option.
+- Added new action to inspect the ArcGIS user account, `-a account`. Returns user account properties such as user type, subscription, email address.
+- Added exports so the module can be imported into another Node.JS app.
+- Improved some error handling and command output.
+- Fixed a bug with how referrers are specified.
+
 ## v1.1.1 25-July-2026
 
 - Update/improve all exit codes ([#6](https://github.com/jf990/api-key-cli/issues/6)).

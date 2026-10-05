@@ -1,33 +1,45 @@
 /**
  * Utility functions to work with ArcGIS Online reports.
  */
-import { ArcGISIdentityManager, request } from "@esri/arcgis-rest-request";
+import { request } from "@esri/arcgis-rest-request";
+import { log } from "./utils.js";
 import fsExtra from "fs-extra";
-import chalk from "chalk";
 
 async function downloadReportFile(itemId, authentication) {
-    return new Promise(async function(resolve, reject) {
+    return new Promise(function(resolve, reject) {
         const itemURL = authentication.portal + "/content/items/" + itemId + "/data";
-        console.log(chalk.blue("Downloading report from: " + itemURL));
+        log("Downloading report from: " + itemURL, "info");
 
-        const response = await fetch(`${itemURL}?token=${authentication.token}`, {
+        fetch(`${itemURL}?token=${authentication.token}`, {
             method: "GET"
-        });
-
-        if (!response.ok) {
-            reject(new Error(`Failed to download report: ${response.status} ${response.statusText}`));
-            return;
-        }
-
-        const fileData = await response.text();
-        fsExtra.writeFile("api-key-usage-report.csv", fileData, function(error) {
-            if (error) {
-                console.log(chalk.red(`Cannot save CSV file: ${error.message}.`));
-                reject(error);
-            } else {
-                console.log(chalk.green("Usage report saved as api-key-usage-report.csv."));
-                resolve();
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                reject(new Error(`Failed to download report: ${response.status} ${response.statusText}`));
+                return;
             }
+
+            response.text()
+            .then(function(fileData) {
+                const fileName = "api-key-usage-report.csv";
+                fsExtra.writeFile(fileName, fileData, function(error) {
+                    if (error) {
+                        log(`Cannot save CSV file: ${error.message}.`, "error");
+                        reject(error);
+                    } else {
+                        log(`Usage report saved as ${fileName}.`, "info");
+                        resolve();
+                    }
+                });
+            })
+            .catch(function(error) {
+                log(`Failed to read report file: ${error.message}.`, "error");
+                reject(error);
+            });
+        })
+        .catch(function(error) {
+            log(`Failed to download report: ${error.message}.`, "error");
+            reject(error);
         });
     });
 }
@@ -60,7 +72,7 @@ async function createServiceUsageReport(reportOptions, authentication) {
                 params: parameters
             })
             .then(async function(response) {
-                console.log("Service usage report response:\n" + JSON.stringify(response));
+                log("Service usage report response:\n" + JSON.stringify(response), "info");
                 const itemId = response.itemId;
                 const statusURL = `${authentication.portal}/sharing/rest/content/users/${authentication.username}/items/${itemId}/status?token=${authentication.token}`;
                 let taskStatus = response.status;
@@ -83,10 +95,10 @@ async function createServiceUsageReport(reportOptions, authentication) {
 
                 // download report CSV file
                 if (taskStatus === "completed") {
-                    console.log("Report generation completed. Downloading report...");
+                    log("Report generation completed. Downloading report...", "info");
                     await downloadReportFile(itemId, authentication);
                 } else {
-                    console.log(chalk.red(`Report generation failed or timed out. Final task status: ${taskStatus}`));
+                    log(`Report generation failed or timed out. Final task status: ${taskStatus}`, "error");
                 }
                 resolve();
             })
@@ -95,7 +107,7 @@ async function createServiceUsageReport(reportOptions, authentication) {
                 const message = exception.toString();
                 if (message.indexOf("ArcGISRequestError: 400") >= 0 && message.indexOf("item id:") >= 0) {
                     const itemId = message.split("item id:")[1].trim();
-                    console.log("Report already exists. Downloading existing report from item: " + itemId);
+                    log("Report already exists. Downloading existing report from item: " + itemId, "info");
                     downloadReportFile(itemId, authentication)
                     .then(function() {
                         resolve();

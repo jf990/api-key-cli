@@ -1,9 +1,15 @@
 {
     "name": "api-key-cli",
-    "version": "1.1.1",
+    "version": "1.2.2",
     "description": "CLI app to provide various helpers for working with ArcGIS API keys",
     "main": "source/index.js",
     "type": "module",
+    "module": "source/export.js",
+    "exports": {
+        ".": {
+            "import": "./source/export.js"
+        }
+    },
     "bin": {
         "api-key-cli": "source/index.js",
         "api-key-helper": "source/index.js"
@@ -18,6 +24,7 @@
     "homepage": "https://github.com/jf990/api-key-cli#readme",
     "scripts": {
         "start": "node ./source/index.js",
+        "lint": "eslint .",
         "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
     },
     "keywords": [
@@ -35,18 +42,22 @@
         "access": "public"
     },
     "dependencies": {
-        "@esri/arcgis-rest-developer-credentials": "^4.10.3",
-        "@esri/arcgis-rest-portal": "^4.10.3",
-        "@esri/arcgis-rest-request": "^4.10.3",
-        "chalk": "^5.6.2",
+        "@eslint/compat": "^2.1.1",
+        "@eslint/js": "^10.0.1",
+        "@esri/arcgis-rest-developer-credentials": "^4.11.0",
+        "@esri/arcgis-rest-portal": "^4.11.0",
+        "@esri/arcgis-rest-request": "^4.11.0",
+        "chalk": "^6.0.0",
         "dotenv": "^17.4.2",
+        "eslint": "^10.11.0",
         "esm": "^3.2.25",
         "fs-extra": "^11.4.0",
+        "globals": "^17.12.0",
         "path": "^0.12.7",
-        "yaml": "^2.9.0",
-        "yargs": "^18.0.0"
+        "yaml": "^2.9.1",
+        "yargs": "^18.1.0"
     },
     "devDependencies": {
-        "jest": "^30.4.2"
+        "jest": "^30.5.1"
     }
 }

@@ -1,11 +1,11 @@
 /**
  * Utility functions to work with API key items in an ArcGIS Organization.
  */
-import { searchItems, SearchQueryBuilder, createItem, updateItem, getItem, removeItem, getSelf } from "@esri/arcgis-rest-portal";
+import process from "node:process";
+import { getSelf } from "@esri/arcgis-rest-portal";
 import { createApiKey, updateApiKey, invalidateApiKey, getApiKey } from '@esri/arcgis-rest-developer-credentials';
-import { request, ArcGISIdentityManager } from "@esri/arcgis-rest-request";
+import { ArcGISIdentityManager } from "@esri/arcgis-rest-request";
 import {
-    setVerbose,
     log,
     getAccessTokenParameter,
     getItemIDParameter,
@@ -16,7 +16,6 @@ import {
     sleeper,
     isNumeric,
     normalizeItemType,
-    geocodeAddress,
     saveJSONFile,
     saveCSVFile,
     appendToken,
@@ -25,19 +24,15 @@ import {
 } from "./utils.js";
 import {
     signInWithArcGIS,
-    ArcGISPrivileges,
-    getAuthenticationItems,
-    getAPIKeyItems,
     getUserAuthenticationItems,
     getUserAPIKeyItems,
     getSubscriptionPrivileges,
     updatePortalItem,
-    getPortalItem,
     deletePortalItem,
-    getLocationServiceEndpointFromPrivilege
+    getLocationServiceEndpointFromPrivilege,
+    getPortalSelfURL
 } from "./arcGISItemHelpers.js";
 import { createServiceUsageReport } from "./usageReport.js";
-const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&token=";
 
 /**
  * Generate a usage report for the logged in user.
@@ -58,10 +53,11 @@ const serviceURL = "https://www.arcgis.com/sharing/rest/portals/self?f=json&toke
  * Generate a usage report of all developer credentials for the logged in user.
  * @param {string} outputFile Path to save the report CSV file.
  * @param {string} outputFileFormat Format of the output file (e.g., "csv" or "json").
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function usageReport(outputFile, outputFileFormat) {
+async function usageReport(outputFile, outputFileFormat, environment) {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(async function(authentication) {
             if (authentication && authentication.username) {
                 getUserAuthenticationItems(authentication)
@@ -105,16 +101,16 @@ async function usageReport(outputFile, outputFileFormat) {
     }
 }
 
-
 /**
  * Generate a expiration report of all API keys that will expire within a certain number of days, sorted by expiration date.
  * @param {integer|string} expireDate Number of days until expiration, or specific date, to use as a cutoff for the report. For example, if 30 is passed, the report will include all API keys that have an expiration date within the next 30 days.
  * @param {string} outputFile Path to save the report CSV file.
  * @param {string} outputFileFormat Format of the output file (e.g., "csv" or "json").
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function expirationReport(expireDate, outputFile, outputFileFormat) {
+async function expirationReport(expireDate, outputFile, outputFileFormat, environment) {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(function(authentication) {
             if (authentication && authentication.username) {
                 getUserAPIKeyItems(authentication)
@@ -179,13 +175,14 @@ async function expirationReport(expireDate, outputFile, outputFileFormat) {
  * @param {integer} numberOfKeys Number of keys to create.
  * @param {string} outputFile Path to save the report CSV file.
  * @param {string} outputFileFormat Format of the output file (e.g., "csv" or "json").
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputFileFormat) {
+async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputFileFormat, environment) {
     if (numberOfKeys < 1) {
         numberOfKeys = 1;
     }
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(async function(authentication) {
             if (authentication && authentication.username) {
                 const newKeys = [];
@@ -243,8 +240,9 @@ async function createNewAPIKeys(apiKeyOptions, numberOfKeys, outputFile, outputF
  * -p: privileges to add, comma separated string, e.g. "basemaps,places"
  * -r: referrers to add, comma separated string, e.g. "https://myapp.com/*"
  * @param {object} args Command line arguments.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function updateAPIKeyProperties(args) {
+async function updateAPIKeyProperties(args, environment) {
     // based on the command line options determine if the item needs to be updated, or if the API key properties need to be updated,
     // as they are two different API calls.
     let hasAPIKeyUpdateOptions = false;
@@ -278,13 +276,18 @@ async function updateAPIKeyProperties(args) {
             apiKeyOptions.privileges = [];
         }
     }
-    const referrers = args.r ?? fileOptions?.referrers ?? null;
+    let referrers = args.r ?? fileOptions?.httpReferrers ?? null;
     if (referrers !== null) {
-        apiKeyOptions.httpReferrers = referrers.split(",").map(function(element) { return element.trim(); });
-        hasAPIKeyUpdateOptions = true;
-        if (apiKeyOptions.httpReferrers.length === 1 && apiKeyOptions.httpReferrers[0] === "") {
-            apiKeyOptions.httpReferrers = [];
+        if (Array.isArray(referrers)) {
+            referrers = referrers.map(function(element) { return element.trim(); });
+        } else {
+            referrers = referrers.split(",").map(function(element) { return element.trim(); });
         }
+        if (referrers.length === 1 && referrers[0] === "") {
+            referrers = [];
+        }
+        apiKeyOptions.httpReferrers = referrers;
+        hasAPIKeyUpdateOptions = true;
     }
     const redirectURIs = args.u ?? fileOptions?.redirectURIs ?? null;
     if (redirectURIs !== null) {
@@ -315,7 +318,7 @@ async function updateAPIKeyProperties(args) {
         hasItemUpdateOptions = true;
     }
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(async function(authentication) {
             if (authentication && authentication.username) {
                 const updateTasks = [];
@@ -375,10 +378,11 @@ async function updateAPIKeyProperties(args) {
  * tokens generated from that item. Also note this will delete any portal item, not just
  * API keys, so be careful to only pass the item ID of an API key.
  * @param {string} itemID ArcGIS item identifier of the API key to delete.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
- async function deleteItem(itemID) {
+ async function deleteItem(itemID, environment) {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(function(authentication) {
             if (authentication && authentication.username) {
                 deletePortalItem(itemID, authentication)
@@ -412,11 +416,12 @@ async function updateAPIKeyProperties(args) {
  * @param {string} referrer Optional. Referrer URL to include in the request. Default is an empty string.
  * @param {string} outFile Optional. If provided, will save the output to a file instead of logging to the console. Default is "stdout".
  * @param {string} format Optional. If outputting to a file, can specify the format as "json" or "csv". Default is "json".
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function inspectAPIKeyToken(token, referrer = "",outFile = "stdout", format = "json") {
+async function inspectAPIKeyToken(token, referrer = "", outFile = "stdout", format = "json", environment = "prod") {
     if (token !== "") {
         try {
-            const response = await fetch(`${serviceURL}${encodeURIComponent(token)}`, {
+            const response = await fetch(getPortalSelfURL(environment, token), {
                 method: "GET",
                 headers: {
                     Accept: "application/json",
@@ -429,8 +434,7 @@ async function inspectAPIKeyToken(token, referrer = "",outFile = "stdout", forma
             }
             const jsonResponse = await response.json();
             if (jsonResponse.error) {
-                // { error: { code: 498, message: 'Invalid token.', details: [] } }
-                log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+                log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message} ${JSON.stringify(jsonResponse.error.details)}`, "error");
                 return process.exit(90);
             } else {
                 const reducedResponse = {
@@ -468,10 +472,11 @@ async function inspectAPIKeyToken(token, referrer = "",outFile = "stdout", forma
  * @param {string} itemID ArcGIS item identifier.
  * @param {string} outFile Optional. If provided, will save the output to a file instead of logging to the console. Default is "stdout".
  * @param {string} format Optional. If outputting to a file, can specify the format as "json" or "csv". Default is "json".
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
+async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json", environment = "prod") {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(async function(authentication) {
             if (authentication && authentication.username) {
                 getApiKey({
@@ -528,10 +533,11 @@ async function inspectAPIKeyItem(itemID, outFile = "stdout", format = "json") {
 /**
  * Revoke API key access tokens. Pass -i itemId for which API key item, and pass -k 1, 2, or all for which token to revoke.
  * @param {object} args CLI arguments. We are looking for -i and -k.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function revokeAPIKey(args) {
+async function revokeAPIKey(args, environment = "prod") {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(function(authentication) {
             if (authentication && authentication.username) {
                 const itemId = getItemIDParameter(args);
@@ -595,10 +601,11 @@ async function revokeAPIKey(args) {
  * generate new tokens for api key 1, 2 or both, given the item ID.
  * command line options: -i itemID of the API key to update, -k 1/2/* for which token to regenerate, -d date or daysUntilExpiration for token 1, -e date or daysUntilExpiration for token 2.
  * @param {object} args Command line arguments.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function regenerateAPIKey(args) {
+async function regenerateAPIKey(args, environment = "prod") {
     try {
-        signInWithArcGIS()
+        signInWithArcGIS(environment)
         .then(function(authentication) {
             if (authentication && authentication.username) {
                 const itemId = getItemIDParameter(args);
@@ -657,8 +664,9 @@ async function regenerateAPIKey(args) {
  * Test to see if a given API key has the expected privileges. This is useful for CLI, CI/CD applications
  * to check that an API key has the expected privileges assigned to it.
  * @param {object} args Command line arguments.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function checkPrivileges(args) {
+async function checkPrivileges(args, environment = "prod") {
     const token = getAccessTokenParameter(args);
     const optionsFile = args.c ?? "";
     const expectedPrivileges = args.p ?? "";
@@ -702,7 +710,7 @@ async function checkPrivileges(args) {
     }
     try {
         // verify the expected privileges are present on the subscription for the logged in user.
-        const authentication = await signInWithArcGIS();
+        const authentication = await signInWithArcGIS(environment);
         if (authentication && authentication.username) {
             const subscriptionPrivileges = await getSubscriptionPrivileges(authentication);
             const missingPrivileges = privilegesList.filter(function(privilege) {
@@ -716,7 +724,7 @@ async function checkPrivileges(args) {
                 log("checkPrivileges: all expected privileges are present on your subscription.", "success");
             }
         }
-        const response = await fetch(`${serviceURL}${encodeURIComponent(token)}`, {
+        const response = await fetch(getPortalSelfURL(environment, token), {
             method: "GET",
             headers: {
                 Accept: "application/json",
@@ -729,8 +737,7 @@ async function checkPrivileges(args) {
         }
         const jsonResponse = await response.json();
         if (jsonResponse.error) {
-            // { error: { code: 498, message: 'Invalid token.', details: [] } }
-            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message} ${JSON.stringify(jsonResponse.error.details)}`, "error");
             return process.exit(90);
         } else {
             const actualPrivileges = jsonResponse.appInfo.privileges;
@@ -759,8 +766,9 @@ async function checkPrivileges(args) {
  * will detect a service to test against by looking up the first privileges in the access token, and then
  * send a single request to that service to see if the API key is accepted with the intended referrer.
  * @param {object} args Command line arguments.
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
  */
-async function checkReferrer(args) {
+async function checkReferrer(args, environment = "prod") {
     const token = getAccessTokenParameter(args);
     const referrer = args.r ?? "";
     if (isEmpty(token)) {
@@ -774,11 +782,12 @@ async function checkReferrer(args) {
     log(`checkReferrer: testing your access token with referrer "${referrer}".`, "success");
     try {
         // verify the expected privileges are present on the subscription for the logged in user.
-        const authentication = await signInWithArcGIS();
-        const response = await fetch(`${serviceURL}${encodeURIComponent(token)}`, {
+        const authentication = await signInWithArcGIS(environment);
+        const response = await fetch(getPortalSelfURL(environment, token), {
             method: "GET",
             headers: {
-                Accept: "application/json"
+                Accept: "application/json",
+                Referer: referrer
             }
         });
         if (!response.ok) {
@@ -787,7 +796,7 @@ async function checkReferrer(args) {
         }
         const jsonResponse = await response.json();
         if (jsonResponse.error) {
-            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message}`, "error");
+            log(`Error ${jsonResponse.error.code}: ${jsonResponse.error.message} ${JSON.stringify(jsonResponse.error.details)}`, "error");
             return process.exit(90);
         } else {
             const actualPrivileges = jsonResponse.appInfo.privileges;
@@ -819,7 +828,7 @@ async function checkReferrer(args) {
                             log(`checkReferrer: referrer ${referrer} is NOT present in API key item ${itemId} referrers: ${referrersFlat}`, "error");
                         }
                     }
-                    const serviceEndPoint = getLocationServiceEndpointFromPrivilege(actualPrivileges);
+                    const serviceEndPoint = getLocationServiceEndpointFromPrivilege(actualPrivileges, environment);
                     if (serviceEndPoint) {
                         log(`checkReferrer: testing API key against service endpoint ${serviceEndPoint}`, "info");
                         fetch(appendToken(serviceEndPoint, token), {
@@ -861,6 +870,62 @@ async function checkReferrer(args) {
     }
 }
 
+/**
+ * Inspect properties on the account used to log in with the specified environment.
+ * @param {string} format Optional. Specify the format as "json" or "text". Default is "json".
+ * @param {string} outputFile Optional. If provided, will save the output to a file instead of logging to the console. Default is "stdout".
+ * @param {string} environment The environment to use (e.g., "dev", "qa", "prod").
+ */
+async function inspectArcGISAccount(format, outputFile, environment) {
+    try {
+        signInWithArcGIS(environment)
+        .then(async function(authentication) {
+            if (authentication && authentication.username) {
+                const userIdentity = await ArcGISIdentityManager.fromToken({
+                    token: authentication.token,
+                    expires: authentication.expires,
+                    username: authentication.username,
+                    portal: authentication.portal
+                });
+                const userInfo = await getSelf({ authentication: userIdentity });
+                if ( ! userInfo || ! userInfo.user || ! userInfo.user.privileges) {
+                    throw new Error(`Unable to retrieve user information or privileges from the portal on ${environment}, check your authentication token.`);
+                }
+                const userProperties = {
+                    environment: environment,
+                    username: userInfo.user.username,
+                    fullName: userInfo.user.fullName,
+                    email: userInfo.user.email,
+                    created: localDateFormat(userInfo.user.created),
+                    lastModified: localDateFormat(userInfo.user.modified),
+                    lastLogin: localDateFormat(userInfo.user.lastLogin),
+                    isVerified: userInfo.isVerified,
+                    region: userInfo.region,
+                    userType: userInfo.user.userLicenseTypeId,
+                    subscriptionId: userInfo.subscriptionInfo.id,
+                    subscriptionType: userInfo.subscriptionInfo.type,
+                    subscriptionState: userInfo.subscriptionInfo.state,
+                    userLicenseTypes: userInfo.subscriptionInfo.userLicenseTypes
+                };
+                if (outputFile && format === "json") {
+                    await saveJSONFile(userProperties, outputFile);
+                } else if (outputFile && format === "csv") {
+                    await saveCSVFile(userProperties, outputFile);
+                } else {
+                    log(JSON.stringify(userProperties, null, 2), "data");
+                }
+            }
+        })
+        .catch(function(error) {
+            log(`inspectArcGISAccount exception on ${environment} ${error.message}`, "error");
+            return process.exit(98);
+        });
+    } catch (exception) {
+        log(`inspectArcGISAccount request on ${environment} failed: ${exception.message}`, "error");
+        return process.exit(90);
+    }
+}
+
 export {
     usageReport,
     expirationReport,
@@ -869,6 +934,7 @@ export {
     deleteItem,
     inspectAPIKeyToken,
     inspectAPIKeyItem,
+    inspectArcGISAccount,
     revokeAPIKey,
     regenerateAPIKey,
     checkPrivileges,

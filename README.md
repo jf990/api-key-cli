@@ -5,24 +5,37 @@ Node.js CLI app to provide various helpers for working with ArcGIS API keys.
 - Get a list of your API keys and OAuth apps.
 - Get a report of your API key and OAuth app service usage.
 - Get a list of your API keys that are about to expire.
-- Revoke keys.
-- Regenerate keys.
-- Update the item meta data.
 - Create new keys.
+- Regenerate keys.
+- Revoke keys.
+- Update the item meta data.
 - Inspect a key or portal item to determine what attributes it has.
-- Verify your ArcGIS subscription or an access token have the expected privileges.
+- Verify the expected privileges appear on your ArcGIS subscription or an access token.
 - Verify API key referrers.
+- Inspect your ArcGIS user account.
 
 ## Why
 
-Working with API keys and developer credentials is typically done with either the [ArcGIS Location Platform dashboard](https://location.arcgis.com/dashboard/), the [ArcGIS Online home app](https://org.maps.arcgis.com/home/content.html#my), or with the [REST API](https://developers.arcgis.com/rest/). These options do not provide enough flexibility to manage access tokens in bulk and do not provide means to script and automate such as in CI/CD use cases. This tool is designed to help reduce the effort to manage ArcGIS access tokens for scripting and CI/CD use cases.
+Working with API keys and developer credentials is typically done with either the [ArcGIS Location Platform dashboard](https://location.arcgis.com/dashboard/), the [ArcGIS Online home app](https://org.maps.arcgis.com/home/content.html#my), or with the [REST API](https://developers.arcgis.com/rest/). These options do not provide enough simplicity and flexibility to manage access tokens in bulk and do not provide means to script and automate such as in CI/CD use cases. This tool is designed to help reduce the effort to manage ArcGIS access tokens for scripting and CI/CD use cases.
+
+An example workflow for a CI/CD system or an agentic workflow could be:
+
+1. Edit `./api-key-attributes.yaml` with the API key meta data (title, description, privileges, referrers).
+2. Set environment variables `ARCGIS_USER_NAME` and `ARCGIS_USER_PASSWORD` (or edit/save `.env`).
+3. Create an API key access token and save it in a JSON file: `npm start -- -a genkeys -n 1 -c "./api-key-attributes.yaml" -f JSON -o cli-api-key.json`.
+4. Run your ArcGIS service request using the token generated: `cURL "https://geocode-api.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&outFields=AddBldg,LongLabel,Type,location,score&singleLine=20+West+34th+Street,+New+York,+NY&token=$(jq -r '.[0].token' ./cli-api-key.json)"`.
+5. When the test completes revoke the token: `npm start -- -a revoke -k all -i $(jq -r '.[0].itemID' ./cli-api-key.json)"` or delete the API key completely `npm start -- -a delete -i $(jq -r '.[0].itemID' ./cli-api-key.json)"`
+
+NOTE: If you install with `npm install -g api-key-cli` then replace `npm start -- ...` with `api-key-cli ...`.
 
 ## Accounts
 
 You need an ArcGIS account in order to use this tool. There are two possibilities:
 
 * [ArcGIS Location Platform account](https://location.arcgis.com). You can [sign up for a free account](https://location.arcgis.com/sign-up/) if you do not have one.
-* [ArcGIS Online account](https://www.esri.com/en-us/arcgis/products/user-types/overview) of type Creator (or high privilege level).
+* [ArcGIS Online account](https://www.esri.com/en-us/arcgis/products/user-types/overview) of type Creator (or higher privilege level) with custom privileges to create developer credentials.
+
+> This tool does not work with ArcGIS Enterprise accounts or developer credentials generated from an ArcGIS Enterprise instance.
 
 ## Set up
 
@@ -36,59 +49,64 @@ You need an ArcGIS account in order to use this tool. There are two possibilitie
 
 ## Command line arguments
 
-* ✅ `-a genkeys`: generate new API keys using API key options template (see YAML file format below).
-    `-n` numberOfKeys
-    `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), default is `./api-key-attributes.yaml`
-    `-f` output format CSV|JSON|STDOUT
-    `-o` output file path, if empty and not STDOUT then "api-keys"
-* ✅ `-a inspect`: show properties for a single api key.
-    `-t` token or an existing API key access token or user OAuth access token
-    `-i` itemId and ArcGIS portal item identifier
-    `-f` output format CSV|JSON|STDOUT
-    `-o` output file path, if empty and not STDOUT then "api-keys"
+Each command is defined with the `-a` flag followed by the command and any additional arguments to pass to the command.
+
+* __Create new API keys__: `-a genkeys` to generate new API keys using API key options template (see YAML file format below).
+    `-n` number of API keys to create (defaut is 1).
+    `-c` options file path to the API key options [YAML formatted file](#api-key-attributes), default is `./api-key-attributes.yaml` (required that this YAML file exists or this command will fail).
+    `-f` output format CSV|JSON|STDOUT. Default is JSON.
+    `-o` output file path, if empty and not STDOUT then default is "api-keys".
+* __Inspect API key configuration__: `-a inspect` show properties for a single api key.
+    `-t` token or an existing API key access token or user OAuth access token.
+    `-i` itemId and ArcGIS portal item identifier.
+    `-f` output format CSV|JSON|STDOUT.
+    `-o` output file path, if empty and not STDOUT then "api-keys".
     `-r` (optional) a referrer URL to match a referrer set on the API key.
-* ✅ `-a report`: generate API keys report as CSV file.
-    `-f` output format CSV|JSON|STDOUT
-    `-o` output file path, if empty and not STDOUT then "api-keys"
-* ✅ `-a expire`: generate API keys report ordered by expiration date.
-    `-d` date or daysUntilExpiration, default is 30
-    `-f` output format CSV|JSON|STDOUT
-    `-o` output file path, if empty and not STDOUT then "api-keys-expiration"
-* ✅ `-a revoke`: revoke a token on an existing api key.
-    `-i` ArcGIS portal item identifier of the API key to revoke
-    `-k` 1|2|all for which token to revoke, token 1, 2 or all tokens
-* ✅ `-a regen`: generate new tokens for an existing api key.
-    `-i` ArcGIS portal item identifier of the API key to update
-    `-k` 1|2|all for which token to regenerate
-    `-d` date or daysUntilExpiration key 1
-    `-e` date or daysUntilExpiration key 2
-* ✅ `-a update`: update an API key meta data such as title, description, tags, privileges, referrers, or redirect URIs.
-    `-i` ArcGIS portal item identifier of the API key to update
+* __Report on API keys__: `-a report` generate a report on all account API keys as CSV file.
+    `-f` output format CSV|JSON|STDOUT.
+    `-o` output file path, if empty and not STDOUT then "api-keys".
+* __Expired keys report__: `-a expire` generate API keys report ordered by expiration date.
+    `-d` date or daysUntilExpiration, default is 30.
+    `-f` output format CSV|JSON|STDOUT.
+    `-o` output file path, if empty and not STDOUT then "api-keys-expiration".
+* __Revoke an API key__: `-a revoke` revoke an APi key access token.
+    `-i` ArcGIS portal item identifier of the API key to revoke.
+    `-k` 1|2|all for which token to revoke, token 1, 2 or all tokens.
+* __Generate API key__: `-a regen` generate new tokens (key1 or key2) for an existing API key.
+    `-i` ArcGIS portal item identifier of the API key to update.
+    `-k` 1|2|all for which token to regenerate.
+    `-d` date or daysUntilExpiration key 1.
+    `-e` date or daysUntilExpiration key 2.
+* __Update API key configuration__: `-a update` update an API key meta data such as title, description, tags, privileges, or referrers. WARNING: if you update privileges or referrers, any existing access tokens will be invalidated.
+    `-i` ArcGIS portal item identifier of the API key to update.
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), or use the following command line options (NOTE: not easy to do this on the CLI if using any special characters):
-    `-t` title
-    `-d` description
-    `-k` tags comma separated string
-    `-p` privileges comma separated string
-    `-r` referrers comma separated string
-* ✅ `-a delete`: delete an existing api key.
-    `-i` ArcGIS portal item identifier of the API key to delete
-* ✅ `-a privchk`: check that a given API key has the required privileges assigned. Also verifies the subscription contains those requested privileges.
-    `-t` token or an existing API key access token
+    `-t` title.
+    `-d` description.
+    `-k` tags comma separated string.
+    `-p` privileges comma separated string.
+    `-r` referrers comma separated string.
+* __Delete API key__: `-a delete` delete an existing API key.
+    `-i` ArcGIS portal item identifier of the API key to delete.
+* __Check API key privileges__: `-a privchk` check that a given API key has the required privileges assigned. Also verifies the subscription contains those requested privileges.
+    `-t` user access token or an existing API key access token.
     `-c` optionsFilePath to the API key options [YAML formatted file](#api-key-attributes), expect to find the `privileges` array. If not provided will look at `-p` (at least one of -p or -c is required).
     `-p` privileges list, a comma separated list of privileges. If not provided will look at `-c`.
     `-r` (optional) a referrer URL to match a referrer set on the API key.
-* ✅ `-a refchk`: check that a specific referrer is set on a given API key.
+* __Check API key referrers__: `-a refchk` check that a specific referrer is set on a given API key.
     `-t` token or an existing API key access token.
     `-r` a referrer URL to match a referrer set on the API key.
-* `-v` verbose output, will send extra information to STDOUT. Will mess up CSV or JSON output when not saving to a file.
-* `-h` show help on CLI arguments.
-* `--version` show version information.
+* __Inspect ArcGIS user account__: `-a account` inspect ArcGIS user account properties such as user type, subscription, email address.
+* __Verbose output__: `-v` verbose output will send extra information to STDOUT. Useful for debugging. It will mess up CSV or JSON output when not saving to a file.
+* __Help__: `-h` show help on CLI arguments.
+* __Version__: `--version` show version information.
+
+For any command you can add the `-s` option to indicate which ArcGIS staging environment should be used. You can also specify using the environment variable `ARCGIS_ENVIRONMENT` (if both are provided the command line option takes precedence). This stage must match the user account and authentication used in the request (for example, an account defined in the production environment will generate an API key that will only work against production services). Use one of "prod|dev|qa". Anything not recognized will default to "prod".
 
 ### Referrer
 
-Certain operations will require a referrer to match a referrer URL that is set on the API key. Use the `-r` argument to provide a referrer to the request. Referrer URLs should be enclosed in double quotes. You can only specify one referrer this way, be sure to choose one that matches one set on the API key. You do not need to specify a referrer if no referrers are set on the key or if the referrer is set to "*".
+Certain operations will require a referrer to match a referrer URL that is set on the API key. Use the `-r` argument to provide a referrer to the request. Referrer URLs should be enclosed in double quotes. You can only specify one referrer this way, be sure to choose one that matches one that is set on the API key. You do not need to specify a referrer if no referrers are set on the key or if the referrer is set to "*".
 
-For example, if your API key has a referrer set to http://localhost, the request will fail if not issued from that referring URL. Therefore, run the inspect command with a referrer specific `api-key-cli -a inspect -r "http://localhost" -t YOUR_API_KEY`
+For example, if your API key has a referrer set to `http://localhost`, the request will fail if not issued from that referring URL. Therefore, run the inspect command with a referrer specific `api-key-cli -a inspect -r "http://localhost" -t YOUR_API_KEY`
 
 ## .env tokens
 
@@ -98,6 +116,10 @@ Certain parameters can be sent in via environment variables. These will override
 - `ARCGIS_USER_PASSWORD`: (required) Password to account.
 - `ARCGIS_TOKEN`: (optional) An ArcGIS access token or API key, this will override any `-t` CLI argument.
 - `ARCGIS_ITEM_ID`: (optional) An ArcGIS portal item identifier, this will override any `-i` CLI argument.
+
+Do not commit the `.env` file to source control. This is only a convinenence, always keep your API keys and user name/password private.
+
+When this tool is running in a CI/CD environment such as GitHub Actions, the `.env` file is not used and the required environment variables are to be set from the CI/CD process.
 
 ## API key attributes
 
@@ -128,15 +150,15 @@ STDOUT and STDERR are honored for logged messages and errors, respectively. The 
 - 98: authentication error, login failed, invalid access token.
 - 99: invalid parameter. An argument you supplied could not be coerced to a valid parameter for the requested operation.
 
-### Test cases
+### Examples
 
-- `npm start -- -a inspect -o my_keys.csv -f csv -t YOUR_API_KEY`
-- `npm start -- -a inspect -i YOUR_ITEM_ID`
-- `npm start -- -a genkeys -n 5 -c api-key-attributes.yaml -o api-keys.json -f json`
+- Inspect the configuration of an individual API key and save the results in a CSV file: `npm start -- -a inspect -o my_keys.csv -f csv -t YOUR_API_KEY`
+- Inspect the configuration of a developer credential portal item and print the results to STDOUT:`npm start -- -a inspect -i YOUR_ITEM_ID`
+- Generate 5 new API keys from the meta attributes defined in the YAML file and save the results in a JSON file: `npm start -- -a genkeys -n 5 -c api-key-attributes.yaml -o api-keys.json -f json`
 
 ### CLI
 
-There are three ways to run this as a command line app. Note that in all cases you will need a `.env` file in your current directory if credentials are requrired (See `.env.sample` for the expected format).
+There are three ways to run this as a command line app. Note that in all cases you will specific environment variables set. For local development and testing you can do this with a `.env` file in your current directory (see `.env.sample` for the expected format).
 
 1. Local project
 
